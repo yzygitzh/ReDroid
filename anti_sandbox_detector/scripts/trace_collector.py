@@ -55,9 +55,9 @@ def parse_args():
     """
     parse command line input
     """
-    parser = argparse.ArgumentParser(description="automated app testing script")
+    parser = argparse.ArgumentParser(description="Automatically test apps on both real devices and emulators")
     parser.add_argument("-c", action="store", dest="config_json_path",
-                        required=True, help="path to config json file")
+                        required=True, help="path/to/trace_collector_config.json")
     options = parser.parse_args()
     return options
 
