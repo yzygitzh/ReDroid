@@ -1,0 +1,14 @@
+{
+    "emulator_id": "emulator-5554",
+    "real_device_id": "06495bbe0ac5b3d1",
+    "apk_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_apps/",
+    "droidbot_args": {
+        "-interval": 3,
+        "-count": 5,
+        "-policy": "bfs",
+        "-no_shuffle": "",
+        "-grant_perm": "",
+        "-use_method_profiling": "full"
+    },
+    "output_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_apps_droidbot_out/"
+}

@@ -1,0 +1,75 @@
+from multiprocessing import Process
+
+import json
+import os
+import argparse
+import subprocess
+
+def tester_func(device_id, apk_path_list, droidbot_args, output_dir):
+    """
+    test apks on the assigned vm/device
+    """
+    for apk_path in apk_path_list:
+        test_cmd = ("droidbot -d {device_id} -a {apk_path} "
+                    "{droidbot_args} -o {output_dir}").format(
+                        device_id=device_id,
+                        apk_path=apk_path,
+                        droidbot_args=" ".join(["%s %s" % (x, droidbot_args[x])
+                                                for x in droidbot_args]),
+                        output_dir="%s/%s/%s" % (output_dir, device_id,
+                                                 apk_path.split("/")[-1][:-len(".apk")]))
+        subprocess.call(test_cmd.split())
+
+
+def run(config_json_path):
+    """
+    parse config file
+    assign work to multiple vm/device's
+    """
+    config_json = json.load(open(os.path.abspath(config_json_path), "r"))
+
+    emulator_id = config_json["emulator_id"]
+    real_device_id = config_json["real_device_id"]
+
+    apk_dir = os.path.abspath(config_json["apk_dir"])
+    apk_path_list = ["%s/%s" % (apk_dir, x) for x in
+                     [x for x in os.walk(apk_dir).next()[2] if x.endswith("apk")]]
+
+    droidbot_args = config_json["droidbot_args"]
+    output_dir = os.path.abspath(config_json["output_dir"])
+
+    # start testers
+    emulator_tester = Process(target=tester_func, args=(
+        emulator_id, apk_path_list, droidbot_args, output_dir))
+    real_device_tester = Process(target=tester_func, args=(
+        real_device_id, apk_path_list, droidbot_args, output_dir))
+
+    emulator_tester.start()
+    real_device_tester.start()
+
+    emulator_tester.join()
+    real_device_tester.join()
+
+
+def parse_args():
+    """
+    parse command line input
+    """
+    parser = argparse.ArgumentParser(description="automated app testing script")
+    parser.add_argument("-c", action="store", dest="config_json_path",
+                        required=True, help="path to config json file")
+    options = parser.parse_args()
+    return options
+
+
+def main():
+    """
+    the main function
+    """
+    opts = parse_args()
+    run(opts.config_json_path)
+    return
+
+
+if __name__ == "__main__":
+    main()
