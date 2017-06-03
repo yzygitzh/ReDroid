@@ -10,14 +10,18 @@ def tester_func(device_id, apk_path_list, droidbot_args, output_dir):
     test apks on the assigned vm/device
     """
     for apk_path in apk_path_list:
+        full_output_dir = "%s/%s/%s" % (output_dir, device_id,
+                                        apk_path.split("/")[-1][:-len(".apk")])
+        if os.system("mkdir -p %s" % full_output_dir):
+            print "failed mkdir -p %s" % full_output_dir
+            continue
         test_cmd = ("droidbot -d {device_id} -a {apk_path} "
                     "{droidbot_args} -o {output_dir}").format(
                         device_id=device_id,
                         apk_path=apk_path,
                         droidbot_args=" ".join(["%s %s" % (x, droidbot_args[x])
                                                 for x in droidbot_args]),
-                        output_dir="%s/%s/%s" % (output_dir, device_id,
-                                                 apk_path.split("/")[-1][:-len(".apk")]))
+                        output_dir=full_output_dir)
         subprocess.call(test_cmd.split())
 
 
