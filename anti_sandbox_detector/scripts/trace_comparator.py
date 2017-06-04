@@ -4,22 +4,100 @@ import json
 import os
 import argparse
 import subprocess
+import re
+import numpy
+import scipy.optimize
 
-def compare_trace(real_device_trace_path, emulator_trace_path, output_dir):
-    """
-    for apk_path in apk_path_list:
-        test_cmd = ("droidbot -d {device_id} -a {apk_path} "
-                    "{droidbot_args} -o {output_dir}").format(
-                        device_id=device_id,
-                        apk_path=apk_path,
-                        droidbot_args=" ".join(["%s %s" % (x, droidbot_args[x])
-                                                for x in droidbot_args]),
-                        output_dir="%s/%s/%s" % (output_dir, device_id,
-                                                 apk_path.split("/")[-1][:-len(".apk")]))
-        subprocess.call(test_cmd.split())
-    """
-    print real_device_trace_path, emulator_trace_path, output_dir
+TRACE_VERSION_RE = re.compile(r"VERSION: ([0-9]+)")
+TRACE_NUM_RE = re.compile(r"Threads \(([0-9]+)\):")
+TRACE_ITEM_RE = re.compile(r"([0-9]+)[ \t]+(ent|xit|unr)(!*)[ \t]+([0-9]+)[ \-\+]([^ \t]+)[ \t]+([^ \t]+)[ \t]+([^ \t]+)")
 
+def process_trace(trace_str):
+    trace_lines = trace_str.split(os.linesep)
+    trace_obj = {}
+
+    idx = 0
+    trace_obj["version"] = int(TRACE_VERSION_RE.match(trace_lines[idx]).groups()[0])
+    idx += 1
+    thread_num = int(TRACE_NUM_RE.match(trace_lines[idx]).groups()[0])
+    idx += 1
+    trace_obj["thread_info"] = {}
+    for i in range(thread_num):
+        thread_name_start_idx = trace_lines[i + idx].find(" ") + 1
+        tid = int(trace_lines[i + idx][:thread_name_start_idx])
+        trace_obj["thread_info"][tid] = {}
+        trace_obj["thread_info"][tid]["name"] = trace_lines[i + idx][thread_name_start_idx:]
+        trace_obj["thread_info"][tid]["trace"] = []
+    idx += thread_num + 1
+    try:
+        while len(trace_lines[idx]):
+            line_info = TRACE_ITEM_RE.match(trace_lines[idx]).groups()
+            trace_obj["thread_info"][int(line_info[0])]["trace"].append(
+                "%s%s %s %s %s" % (line_info[1], line_info[2], line_info[4], line_info[5], line_info[6])
+            )
+            idx += 1
+    except Exception as e:
+        print e
+    # get rid of empty traces
+    tids = trace_obj["thread_info"].keys()
+    for tid in tids:
+        if not len(trace_obj["thread_info"][tid]["trace"]):
+            trace_obj["thread_info"].pop(tid)
+    return trace_obj
+
+
+def trace_similarity(trace_a, trace_b):
+    class_methods_a = set()
+    class_methods_b = set()
+    for trace_item in trace_a:
+        tmp_class_method = trace_item[len("ent "):]
+        dot_count = 0
+        while trace_item[dot_count] == ".":
+            dot_count += 1
+        class_methods_a.add(tmp_class_method[dot_count:])
+    for trace_item in trace_b:
+        tmp_class_method = trace_item[len("ent "):]
+        dot_count = 0
+        while trace_item[dot_count] == ".":
+            dot_count += 1
+        class_methods_b.add(tmp_class_method[dot_count:])
+    return float(len(class_methods_a & class_methods_b)) / max(len(class_methods_a), len(class_methods_b))
+
+
+def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path):
+    p = subprocess.Popen(["dmtracedump", "-o", real_device_trace_path], stdout=subprocess.PIPE)
+    real_device_trace_str = p.communicate()[0]
+    p = subprocess.Popen(["dmtracedump", "-o", emulator_trace_path], stdout=subprocess.PIPE)
+    emulator_trace_str = p.communicate()[0]
+
+    real_device_trace_obj = process_trace(real_device_trace_str)
+    emulator_trace_obj = process_trace(emulator_trace_str)
+
+    # Kuhn-Munkres algorithm for maximum similarity
+    r_tid_list = sorted(real_device_trace_obj["thread_info"].keys())
+    e_tid_list = sorted(emulator_trace_obj["thread_info"].keys())
+    sim_matrix = numpy.zeros([len(r_tid_list), len(e_tid_list)])
+    for i, tid_r in enumerate(r_tid_list):
+        for j, tid_e in enumerate(e_tid_list):
+            sim_matrix[i][j] = -trace_similarity(
+                real_device_trace_obj["thread_info"][tid_r]["trace"],
+                emulator_trace_obj["thread_info"][tid_e]["trace"]
+            )
+    r_idx, e_idx = scipy.optimize.linear_sum_assignment(sim_matrix)
+    trace_similarity_list = []
+    for x, y in zip(r_idx, e_idx):
+        trace_similarity_list.append({
+            "real_device_tid": r_tid_list[x],
+            "emulator_tid": e_tid_list[y],
+            "similarity": -sim_matrix[x][y]
+        })
+
+    with open(output_file_path, "w") as output_file:
+        output_file.write(json.dumps({
+            "real_device": real_device_trace_obj,
+            "emulator": emulator_trace_obj,
+            "thread_mapping": trace_similarity_list
+        }, indent=2))
 
 def run(config_json_path):
     """
@@ -31,6 +109,9 @@ def run(config_json_path):
     real_device_droidbot_out_dir = os.path.abspath(config_json["real_device_droidbot_out_dir"])
     emulator_droidbot_out_dir = os.path.abspath(config_json["emulator_droidbot_out_dir"])
     output_dir = os.path.abspath(config_json["output_dir"])
+    if os.system("mkdir -p %s" % output_dir):
+        print "failed mkdir -p %s" % output_dir
+        return
     process_num = config_json["process_num"]
 
     real_device_apps = [x for x in os.walk(real_device_droidbot_out_dir).next()[1]]
@@ -49,8 +130,11 @@ def run(config_json_path):
                                   if x.endswith(".trace")])
 
         for x, y in zip(real_device_traces, emulator_traces):
+            x_tag = x[len("event_trace_"):-len(".trace")]
+            y_tag = y[len("event_trace_"):-len(".trace")]
             pool.apply_async(compare_trace, ["%s/%s" % (real_device_path, x),
-                                             "%s/%s" % (emulator_path, y), output_dir])
+                                             "%s/%s" % (emulator_path, y),
+                                             "%s/%s_%s_%s.json" % (output_dir, app_name, x_tag, y_tag)])
 
     pool.close()
     pool.join()
