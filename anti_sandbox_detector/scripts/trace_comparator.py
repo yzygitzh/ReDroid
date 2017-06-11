@@ -65,6 +65,16 @@ def trace_similarity(trace_a, trace_b):
 
 
 def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path):
+    # There might be various kinds of differences between real/emu threads
+    # including
+    # 1. different triggered threads
+    # 2. unaligned traces
+    # 3. different tracing time length
+    # For now we only try to detect anti-sandbox behaviors in
+    # ALIGNED, MATCHED and TRUNKED traces.
+    # we ASSUME that every anti-sandbox behavior presented BESIDES the conditions
+    # above are all triggered originally from the conditions above.
+
     p = subprocess.Popen(["dmtracedump", "-o", real_device_trace_path], stdout=subprocess.PIPE)
     real_device_trace_str = p.communicate()[0]
     p = subprocess.Popen(["dmtracedump", "-o", emulator_trace_path], stdout=subprocess.PIPE)
@@ -86,11 +96,29 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path)
     r_idx, e_idx = scipy.optimize.linear_sum_assignment(sim_matrix)
     trace_similarity_list = []
     for x, y in zip(r_idx, e_idx):
-        trace_similarity_list.append({
-            "real_device_tid": r_tid_list[x],
-            "emulator_tid": e_tid_list[y],
-            "similarity": -sim_matrix[x][y]
-        })
+        real_device_trace = real_device_trace_obj["thread_info"][r_tid_list[x]]["trace"]
+        emulator_trace = emulator_trace_obj["thread_info"][e_tid_list[y]]["trace"]
+        trace_aligned = real_device_trace[0] == emulator_trace[0]
+        if trace_aligned:
+            trace_idx = 0
+            max_common_len = min(len(real_device_trace), len(emulator_trace))
+            while trace_idx < max_common_len:
+                if real_device_trace[trace_idx] != emulator_trace[trace_idx]:
+                    break
+                else:
+                    trace_idx += 1
+            trace_similarity_list.append({
+                "real_device_tid": r_tid_list[x],
+                "emulator_tid": e_tid_list[y],
+                "match_similarity": -sim_matrix[x][y],
+                "diverge_info": {
+                    "diverge_idx": trace_idx,
+                    "real_device_trace": real_device_trace[trace_idx] if trace_idx < max_common_len else None,
+                    "emulator_trace": emulator_trace[trace_idx] if trace_idx < max_common_len else None,
+                    "max_common_len": max_common_len,
+                    "max_common_similarity": float(trace_idx) / max_common_len
+                }
+            })
 
     with open(output_file_path, "w") as output_file:
         output_file.write(json.dumps({
