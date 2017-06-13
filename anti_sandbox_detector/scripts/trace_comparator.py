@@ -75,6 +75,9 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path)
     # we ASSUME that every anti-sandbox behavior presented BESIDES the conditions
     # above are all triggered originally from the conditions above.
 
+    # Maybe we can sort traces into different channels by its calling stack
+    # depth, after the diverge point.
+
     p = subprocess.Popen(["dmtracedump", "-o", real_device_trace_path], stdout=subprocess.PIPE)
     real_device_trace_str = p.communicate()[0]
     p = subprocess.Popen(["dmtracedump", "-o", emulator_trace_path], stdout=subprocess.PIPE)
@@ -108,24 +111,20 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path)
                 else:
                     trace_idx += 1
             trace_similarity_list.append({
-                "real_device_tid": r_tid_list[x],
-                "emulator_tid": e_tid_list[y],
-                "match_similarity": -sim_matrix[x][y],
-                "diverge_info": {
-                    "diverge_idx": trace_idx,
-                    "real_device_trace": real_device_trace[trace_idx] if trace_idx < max_common_len else None,
-                    "emulator_trace": emulator_trace[trace_idx] if trace_idx < max_common_len else None,
-                    "max_common_len": max_common_len,
-                    "max_common_similarity": float(trace_idx) / max_common_len
-                }
+                "real_id": r_tid_list[x],
+                "real_name": real_device_trace_obj["thread_info"][r_tid_list[x]]["name"],
+                "real_trace": real_device_trace[trace_idx:trace_idx + 1],
+                "emu_id": e_tid_list[y],
+                "emu_name": emulator_trace_obj["thread_info"][e_tid_list[y]]["name"],
+                "e_trace": emulator_trace[trace_idx:trace_idx + 1],
+                "sim_cov": -sim_matrix[x][y],
+                "max_common_len": max_common_len,
+                "diverge_idx": trace_idx,
+                "sim_max_common": float(trace_idx) / max_common_len
             })
 
     with open(output_file_path, "w") as output_file:
-        output_file.write(json.dumps({
-            "real_device": real_device_trace_obj,
-            "emulator": emulator_trace_obj,
-            "thread_mapping": trace_similarity_list
-        }, indent=2))
+        output_file.write(json.dumps(trace_similarity_list, indent=2))
 
 def run(config_json_path):
     """
