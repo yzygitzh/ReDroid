@@ -1,10 +1,12 @@
 from multiprocessing import Process, Pool
 
+import argparse
 import json
 import os
-import argparse
-import subprocess
 import re
+import subprocess
+import zipfile
+
 import numpy
 import scipy.optimize
 
@@ -20,9 +22,10 @@ def trace_str_to_class_method(trace_str):
         trace_idx += 1
     return trace_str[trace_idx:]
 
-def clean_trace(trace_list):
+def clean_trace(trace_list, ex_package_set):
     # Clean irrelevant traces like java.lang, android.view
-    ex_class_list = [
+    """
+    ex_package_set = [
         "android.",
         "com.android",
         "com.google.android.collect",
@@ -31,13 +34,19 @@ def clean_trace(trace_list):
         "libcore.",
         "sun.",
     ]
-
+    """
     ret_trace_list = []
     for trace_str in trace_list:
         trimmed_trace_str = trace_str_to_class_method(trace_str)
         trace_removed = False
-        for ex_class in ex_class_list:
-            if trimmed_trace_str.startswith(ex_class):
+
+        trimmed_trace_str = trimmed_trace_str.split("$")[0]
+
+        trace_segments = trimmed_trace_str.split(".")
+        for idx, trace_segment in enumerate(trace_segments):
+            if trace_segment.find(" ") >= 0:
+                break
+            elif ".".join(trace_segments[:idx + 1]) in ex_package_set:
                 trace_removed = True
                 break
         if not trace_removed:
@@ -80,6 +89,7 @@ def process_trace(trace_str):
 
 def trace_similarity(name_a, trace_a, name_b, trace_b):
     # cov similarity and name similarity
+    # TODO: sensitive API (PScout) call pattern
 
     class_methods_a = set()
     class_methods_b = set()
@@ -93,7 +103,7 @@ def trace_similarity(name_a, trace_a, name_b, trace_b):
     return name_sim * cov_sim
 
 
-def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path):
+def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path, ex_package_set):
     # There might be various kinds of differences between real/emu threads
     # including
     # 1. different triggered threads
@@ -134,8 +144,8 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path)
     r_idx, e_idx = scipy.optimize.linear_sum_assignment(sim_matrix)
     trace_similarity_list = []
     for x, y in zip(r_idx, e_idx):
-        real_device_trace = clean_trace(real_device_trace_obj["thread_info"][r_tid_list[x]]["trace"])
-        emulator_trace = clean_trace(emulator_trace_obj["thread_info"][e_tid_list[y]]["trace"])
+        real_device_trace = clean_trace(real_device_trace_obj["thread_info"][r_tid_list[x]]["trace"], ex_package_set)
+        emulator_trace = clean_trace(emulator_trace_obj["thread_info"][e_tid_list[y]]["trace"], ex_package_set)
 
         trace_aligned = len(real_device_trace) == 0 or \
                         len(emulator_trace) == 0 or \
@@ -166,6 +176,20 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path)
 
     return "%s written" % output_file_path
 
+
+def get_irrelevant_packages(irrelevant_package_jars):
+    package_set = set()
+    for jar_path in irrelevant_package_jars:
+        jar_file = zipfile.ZipFile(os.path.abspath(jar_path), "r")
+        file_list = jar_file.infolist()
+        for inner_file in file_list:
+            file_name = inner_file.filename
+            if file_name.endswith(".class"):
+                package_set.add(".".join(file_name.split("/")[:-1]))
+        jar_file.close()
+    return package_set
+
+
 def run(config_json_path):
     """
     parse config file
@@ -185,6 +209,10 @@ def run(config_json_path):
     emulator_apps = [x for x in os.walk(emulator_droidbot_out_dir).next()[1]]
     both_apps = list(set(real_device_apps) & set(emulator_apps))
 
+    # get irrelevant classes
+    ex_package_set = get_irrelevant_packages(config_json["irrelevant_package_jars"])
+    ex_package_set |= set(config_json["irrelevant_packages"])
+
     # generate trace path pairs for comparing
     pool = Pool(processes=process_num)
     result_list = []
@@ -203,7 +231,8 @@ def run(config_json_path):
             async_result = pool.apply_async(compare_trace,
                                             ["%s/%s" % (real_device_path, x),
                                              "%s/%s" % (emulator_path, y),
-                                             "%s/%s_%s_%s.json" % (output_dir, app_name, x_tag, y_tag)])
+                                             "%s/%s_%s_%s.json" % (output_dir, app_name, x_tag, y_tag),
+                                             ex_package_set])
             result_list.append(async_result)
 
     for async_result in result_list:

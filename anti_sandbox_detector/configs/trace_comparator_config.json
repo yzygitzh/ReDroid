@@ -2,5 +2,16 @@
     "real_device_droidbot_out_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_apps_droidbot_out/06495bbe0ac5b3d1/",
     "emulator_droidbot_out_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_apps_droidbot_out/emulator-5554/",
     "output_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_trace_comparator_out/",
-    "process_num": 4
+    "process_num": 4,
+    "irrelevant_package_jars": [
+        "/mnt/EXT_volume/Android/Sdk/platforms/android-24/android.jar",
+        "/mnt/EXT_volume/Android/Sdk/platforms/android-24/data/layoutlib.jar",
+        "/mnt/EXT_volume/Android/Sdk/platforms/android-24/optional/org.apache.http.legacy.jar",
+        "/mnt/EXT_volume/Android/Sdk/platforms/android-24/uiautomator.jar",
+        "/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar"
+    ],
+    "irrelevant_packages": [
+        "com.android.dex",
+        "libcore"
+    ]
 }
