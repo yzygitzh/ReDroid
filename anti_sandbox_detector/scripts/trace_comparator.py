@@ -8,11 +8,19 @@ import re
 import numpy
 import scipy.optimize
 
+
 TRACE_VERSION_RE = re.compile(r"VERSION: ([0-9]+)")
 TRACE_NUM_RE = re.compile(r"Threads \(([0-9]+)\):")
 TRACE_ITEM_RE = re.compile(r"([0-9]+)[ \t]+(ent|xit|unr)(!*)[ \t]+([0-9]+)[ \-\+]([^ \t]+)[ \t]+([^ \t]+)[ \t]+([^ \t]+)")
 
-def is_trace_removed(trace_str):
+
+def trace_str_to_class_method(trace_str):
+    trace_idx = len("ent ")
+    while not trace_str[trace_idx].isalpha():
+        trace_idx += 1
+    return trace_str[trace_idx:]
+
+def clean_trace(trace_list):
     # Clean irrelevant traces like java.lang, android.view
     ex_class_list = [
         "android.",
@@ -24,15 +32,18 @@ def is_trace_removed(trace_str):
         "sun.",
     ]
 
-    trace_idx = len("ent ")
-    while not trace_str[trace_idx].isalpha():
-        trace_idx += 1
-    trace_str = trace_str[trace_idx:]
+    ret_trace_list = []
+    for trace_str in trace_list:
+        trimmed_trace_str = trace_str_to_class_method(trace_str)
+        trace_removed = False
+        for ex_class in ex_class_list:
+            if trimmed_trace_str.startswith(ex_class):
+                trace_removed = True
+                break
+        if not trace_removed:
+            ret_trace_list.append(trace_str)
 
-    for ex_class in ex_class_list:
-        if trace_str.startswith(ex_class):
-            return True
-    return False
+    return ret_trace_list
 
 
 def process_trace(trace_str):
@@ -55,11 +66,9 @@ def process_trace(trace_str):
 
     while len(trace_lines[idx]):
         line_info = TRACE_ITEM_RE.match(trace_lines[idx]).groups()
-        if not is_trace_removed(line_info[4]):
-        # if True:
-            trace_obj["thread_info"][int(line_info[0])]["trace"].append(
-                "%s%s %s %s %s" % (line_info[1], line_info[2], line_info[4], line_info[5], line_info[6])
-            )
+        trace_obj["thread_info"][int(line_info[0])]["trace"].append(
+            "%s%s %s %s %s" % (line_info[1], line_info[2], line_info[4], line_info[5], line_info[6])
+        )
         idx += 1
     # get rid of empty traces
     tids = trace_obj["thread_info"].keys()
@@ -69,22 +78,19 @@ def process_trace(trace_str):
     return trace_obj
 
 
-def trace_similarity(trace_a, trace_b):
+def trace_similarity(name_a, trace_a, name_b, trace_b):
+    # cov similarity and name similarity
+
     class_methods_a = set()
     class_methods_b = set()
-    for trace_item in trace_a:
-        tmp_class_method = trace_item[len("ent "):]
-        dot_count = 0
-        while trace_item[dot_count] == ".":
-            dot_count += 1
-        class_methods_a.add(tmp_class_method[dot_count:])
-    for trace_item in trace_b:
-        tmp_class_method = trace_item[len("ent "):]
-        dot_count = 0
-        while trace_item[dot_count] == ".":
-            dot_count += 1
-        class_methods_b.add(tmp_class_method[dot_count:])
-    return float(len(class_methods_a & class_methods_b)) / (len(class_methods_a | class_methods_b))
+    for trace_str in trace_a:
+        class_methods_a.add(trace_str_to_class_method(trace_str))
+    for trace_str in trace_b:
+        class_methods_b.add(trace_str_to_class_method(trace_str))
+
+    name_sim = float(len(os.path.commonprefix([name_a, name_b]))) / max(len(name_a), len(name_b))
+    cov_sim = float(len(class_methods_a & class_methods_b)) / (len(class_methods_a | class_methods_b))
+    return name_sim * cov_sim
 
 
 def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path):
@@ -105,8 +111,6 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path)
     # 2. filter out some irrelevant methods (now using)
     # 3. automatically generate irrelevant methods by repeating dynamic tests
 
-    # TODO: use full trace to calc coverage similarity
-
     p = subprocess.Popen(["dmtracedump", "-o", real_device_trace_path], stdout=subprocess.PIPE)
     real_device_trace_str = p.communicate()[0]
     p = subprocess.Popen(["dmtracedump", "-o", emulator_trace_path], stdout=subprocess.PIPE)
@@ -122,15 +126,20 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path)
     for i, tid_r in enumerate(r_tid_list):
         for j, tid_e in enumerate(e_tid_list):
             sim_matrix[i][j] = -trace_similarity(
+                real_device_trace_obj["thread_info"][tid_r]["name"],
                 real_device_trace_obj["thread_info"][tid_r]["trace"],
+                emulator_trace_obj["thread_info"][tid_e]["name"],
                 emulator_trace_obj["thread_info"][tid_e]["trace"]
             )
     r_idx, e_idx = scipy.optimize.linear_sum_assignment(sim_matrix)
     trace_similarity_list = []
     for x, y in zip(r_idx, e_idx):
-        real_device_trace = real_device_trace_obj["thread_info"][r_tid_list[x]]["trace"]
-        emulator_trace = emulator_trace_obj["thread_info"][e_tid_list[y]]["trace"]
-        trace_aligned = real_device_trace[0] == emulator_trace[0]
+        real_device_trace = clean_trace(real_device_trace_obj["thread_info"][r_tid_list[x]]["trace"])
+        emulator_trace = clean_trace(emulator_trace_obj["thread_info"][e_tid_list[y]]["trace"])
+
+        trace_aligned = len(real_device_trace) == 0 or \
+                        len(emulator_trace) == 0 or \
+                        real_device_trace[0] == emulator_trace[0]
         if trace_aligned:
             trace_idx = 0
             max_common_len = min(len(real_device_trace), len(emulator_trace))
@@ -149,11 +158,13 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path)
                 "sim_cov": -sim_matrix[x][y],
                 "max_common_len": max_common_len,
                 "diverge_idx": trace_idx,
-                "sim_max_common": float(trace_idx) / max_common_len
+                "sim_max_common": float(trace_idx) / max_common_len if max_common_len else 1.0
             })
 
     with open(output_file_path, "w") as output_file:
         output_file.write(json.dumps(trace_similarity_list, indent=2))
+
+    return "%s written" % output_file_path
 
 def run(config_json_path):
     """
@@ -176,6 +187,7 @@ def run(config_json_path):
 
     # generate trace path pairs for comparing
     pool = Pool(processes=process_num)
+    result_list = []
     for app_name in both_apps:
         real_device_path = "%s/%s/events" % (real_device_droidbot_out_dir, app_name)
         emulator_path = "%s/%s/events" % (emulator_droidbot_out_dir, app_name)
@@ -188,9 +200,14 @@ def run(config_json_path):
         for x, y in zip(real_device_traces, emulator_traces):
             x_tag = x[len("event_trace_"):-len(".trace")]
             y_tag = y[len("event_trace_"):-len(".trace")]
-            pool.apply_async(compare_trace, ["%s/%s" % (real_device_path, x),
+            async_result = pool.apply_async(compare_trace,
+                                            ["%s/%s" % (real_device_path, x),
                                              "%s/%s" % (emulator_path, y),
                                              "%s/%s_%s_%s.json" % (output_dir, app_name, x_tag, y_tag)])
+            result_list.append(async_result)
+
+    for async_result in result_list:
+        print async_result.get()
 
     pool.close()
     pool.join()
