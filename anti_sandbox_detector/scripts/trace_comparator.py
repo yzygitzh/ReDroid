@@ -12,6 +12,29 @@ TRACE_VERSION_RE = re.compile(r"VERSION: ([0-9]+)")
 TRACE_NUM_RE = re.compile(r"Threads \(([0-9]+)\):")
 TRACE_ITEM_RE = re.compile(r"([0-9]+)[ \t]+(ent|xit|unr)(!*)[ \t]+([0-9]+)[ \-\+]([^ \t]+)[ \t]+([^ \t]+)[ \t]+([^ \t]+)")
 
+def is_trace_removed(trace_str):
+    # Clean irrelevant traces like java.lang, android.view
+    ex_class_list = [
+        "android.",
+        "com.android",
+        "com.google.android.collect",
+        "dalvik.system",
+        "java.",
+        "libcore.",
+        "sun.",
+    ]
+
+    trace_idx = len("ent ")
+    while not trace_str[trace_idx].isalpha():
+        trace_idx += 1
+    trace_str = trace_str[trace_idx:]
+
+    for ex_class in ex_class_list:
+        if trace_str.startswith(ex_class):
+            return True
+    return False
+
+
 def process_trace(trace_str):
     trace_lines = trace_str.split(os.linesep)
     trace_obj = {}
@@ -29,15 +52,15 @@ def process_trace(trace_str):
         trace_obj["thread_info"][tid]["name"] = trace_lines[i + idx][thread_name_start_idx:]
         trace_obj["thread_info"][tid]["trace"] = []
     idx += thread_num + 1
-    try:
-        while len(trace_lines[idx]):
-            line_info = TRACE_ITEM_RE.match(trace_lines[idx]).groups()
+
+    while len(trace_lines[idx]):
+        line_info = TRACE_ITEM_RE.match(trace_lines[idx]).groups()
+        if not is_trace_removed(line_info[4]):
+        # if True:
             trace_obj["thread_info"][int(line_info[0])]["trace"].append(
                 "%s%s %s %s %s" % (line_info[1], line_info[2], line_info[4], line_info[5], line_info[6])
             )
-            idx += 1
-    except Exception as e:
-        print e
+        idx += 1
     # get rid of empty traces
     tids = trace_obj["thread_info"].keys()
     for tid in tids:
@@ -61,7 +84,7 @@ def trace_similarity(trace_a, trace_b):
         while trace_item[dot_count] == ".":
             dot_count += 1
         class_methods_b.add(tmp_class_method[dot_count:])
-    return float(len(class_methods_a & class_methods_b)) / max(len(class_methods_a), len(class_methods_b))
+    return float(len(class_methods_a & class_methods_b)) / (len(class_methods_a | class_methods_b))
 
 
 def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path):
@@ -77,6 +100,12 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path)
 
     # Maybe we can sort traces into different channels by its calling stack
     # depth, after the diverge point.
+
+    # 1. use incremental coverage instead of tracing when comparing
+    # 2. filter out some irrelevant methods (now using)
+    # 3. automatically generate irrelevant methods by repeating dynamic tests
+
+    # TODO: use full trace to calc coverage similarity
 
     p = subprocess.Popen(["dmtracedump", "-o", real_device_trace_path], stdout=subprocess.PIPE)
     real_device_trace_str = p.communicate()[0]
@@ -113,10 +142,10 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path)
             trace_similarity_list.append({
                 "real_id": r_tid_list[x],
                 "real_name": real_device_trace_obj["thread_info"][r_tid_list[x]]["name"],
-                "real_trace": real_device_trace[trace_idx:trace_idx + 1],
+                "real_trace": real_device_trace[max(0, trace_idx - 1):trace_idx + 1] if trace_idx < max_common_len else None,
                 "emu_id": e_tid_list[y],
                 "emu_name": emulator_trace_obj["thread_info"][e_tid_list[y]]["name"],
-                "e_trace": emulator_trace[trace_idx:trace_idx + 1],
+                "e_trace": emulator_trace[max(0, trace_idx - 1):trace_idx + 1] if trace_idx < max_common_len else None,
                 "sim_cov": -sim_matrix[x][y],
                 "max_common_len": max_common_len,
                 "diverge_idx": trace_idx,
