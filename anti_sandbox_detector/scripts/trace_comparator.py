@@ -1,6 +1,7 @@
 from multiprocessing import Process, Pool
 
 import argparse
+import csv
 import json
 import os
 import re
@@ -24,17 +25,6 @@ def trace_str_to_class_method(trace_str):
 
 def clean_trace(trace_list, ex_package_set):
     # Clean irrelevant traces like java.lang, android.view
-    """
-    ex_package_set = [
-        "android.",
-        "com.android",
-        "com.google.android.collect",
-        "dalvik.system",
-        "java.",
-        "libcore.",
-        "sun.",
-    ]
-    """
     ret_trace_list = []
     for trace_str in trace_list:
         trimmed_trace_str = trace_str_to_class_method(trace_str)
@@ -90,6 +80,9 @@ def process_trace(trace_str):
 def trace_similarity(name_a, trace_a, name_b, trace_b):
     # cov similarity and name similarity
     # TODO: sensitive API (PScout) call pattern
+    # (combined with diverge history and UI difference to judge whether anti-sandbox)
+    # (malware may not have any UI)
+    # TODO: iteratively remove diverge common prefix from traces
 
     class_methods_a = set()
     class_methods_b = set()
@@ -164,7 +157,7 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path,
                 "real_trace": real_device_trace[max(0, trace_idx - 1):trace_idx + 1] if trace_idx < max_common_len else None,
                 "emu_id": e_tid_list[y],
                 "emu_name": emulator_trace_obj["thread_info"][e_tid_list[y]]["name"],
-                "e_trace": emulator_trace[max(0, trace_idx - 1):trace_idx + 1] if trace_idx < max_common_len else None,
+                "emu_trace": emulator_trace[max(0, trace_idx - 1):trace_idx + 1] if trace_idx < max_common_len else None,
                 "sim_cov": -sim_matrix[x][y],
                 "max_common_len": max_common_len,
                 "diverge_idx": trace_idx,
@@ -177,9 +170,10 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path,
     return "%s written" % output_file_path
 
 
-def get_irrelevant_packages(irrelevant_package_jars):
+def get_irrelevant_packages(irrelevant_packages):
     package_set = set()
-    for jar_path in irrelevant_package_jars:
+
+    for jar_path in irrelevant_packages["jars"]:
         jar_file = zipfile.ZipFile(os.path.abspath(jar_path), "r")
         file_list = jar_file.infolist()
         for inner_file in file_list:
@@ -187,6 +181,17 @@ def get_irrelevant_packages(irrelevant_package_jars):
             if file_name.endswith(".class"):
                 package_set.add(".".join(file_name.split("/")[:-1]))
         jar_file.close()
+
+    package_set |= set(irrelevant_packages["names"])
+
+    with open(os.path.abspath(irrelevant_packages["libs"]), "r") as csv_file:
+        csv_reader = csv.reader(csv_file)
+        first_row = next(csv_reader)
+        for row in csv_reader:
+            package_fields = row[0][len("L"):].split("/")
+            if len(package_fields) > 1 and min([len(x) for x in package_fields]) > 1:
+                package_set.add(".".join(package_fields))
+
     return package_set
 
 
@@ -210,8 +215,7 @@ def run(config_json_path):
     both_apps = list(set(real_device_apps) & set(emulator_apps))
 
     # get irrelevant classes
-    ex_package_set = get_irrelevant_packages(config_json["irrelevant_package_jars"])
-    ex_package_set |= set(config_json["irrelevant_packages"])
+    ex_package_set = get_irrelevant_packages(config_json["irrelevant_packages"])
 
     # generate trace path pairs for comparing
     pool = Pool(processes=process_num)
