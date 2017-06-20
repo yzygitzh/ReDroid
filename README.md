@@ -2,7 +2,7 @@
 
 ## Introduction
 
-ReDroid is a framework for detecting and countering anti-sandbox behaviors in Android apps.
+ReDroid is a toolbox for detecting and countering anti-sandbox behaviors in Android apps.
 
 * What is anti-sandbox behavior
 
