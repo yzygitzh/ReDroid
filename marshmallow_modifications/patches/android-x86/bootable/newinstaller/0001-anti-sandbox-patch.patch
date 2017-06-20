@@ -1,0 +1,32 @@
+From da07e36e987ad5ae940e88276e7d8c0f35145d44 Mon Sep 17 00:00:00 2001
+From: Ziyue Yang <yzylivezh@hotmail.com>
+Date: Tue, 20 Jun 2017 13:16:42 +0800
+Subject: [PATCH] anti sandbox patch
+
+---
+ boot/isolinux/isolinux.cfg | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/boot/isolinux/isolinux.cfg b/boot/isolinux/isolinux.cfg
+index 48ca8fd..de457c5 100644
+--- a/boot/isolinux/isolinux.cfg
++++ b/boot/isolinux/isolinux.cfg
+@@ -1,4 +1,5 @@
+-default vesamenu.c32
++# default vesamenu.c32
++default vesa
+ timeout 600
+ 
+ menu background android-x86.png
+@@ -19,7 +20,7 @@ label livem
+ label vesa
+ 	menu label Live CD - ^VESA mode
+ 	kernel /kernel
+-	append initrd=/initrd.img CMDLINE nomodeset vga=ask SRC= DATA=
++	append initrd=/initrd.img CMDLINE nomodeset vga=normal ramdisk_size=204800 SRC= DATA= SDCARD=ramdisk UVESA_MODE=768x1280 DPI=320
+ 
+ label debug
+ 	menu label Live CD - ^Debug mode
+-- 
+2.11.0
+

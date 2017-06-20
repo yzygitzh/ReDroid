@@ -1,0 +1,29 @@
+From aaed5cff73202b87b1ad1d4c60361e35338a7366 Mon Sep 17 00:00:00 2001
+From: Ziyue Yang <yzylivezh@hotmail.com>
+Date: Tue, 20 Jun 2017 13:16:42 +0800
+Subject: [PATCH] anti sandbox patch
+
+---
+ nativebridge/bin/enable_nativebridge | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/nativebridge/bin/enable_nativebridge b/nativebridge/bin/enable_nativebridge
+index 18a06db..1e6defa 100644
+--- a/nativebridge/bin/enable_nativebridge
++++ b/nativebridge/bin/enable_nativebridge
+@@ -9,8 +9,10 @@ binfmt_misc_dir=/proc/sys/fs/binfmt_misc
+ cd /data/arm
+ if [ -e /system/lib$1/libhoudini.so ]; then
+ 	log -pi -thoudini "found /system/lib$1/libhoudini.so"
+-elif [ -e /system/etc/houdini$1.sfs ]; then
+-	busybox mount /system/etc/houdini$1.sfs $dest_dir
++# elif [ -e /system/etc/houdini$1.sfs ]; then
++elif [ -e /sdcard/houdini$1.sfs ]; then
++#	busybox mount /system/etc/houdini$1.sfs $dest_dir
++	busybox mount /sdcard/houdini$1.sfs $dest_dir
+ else
+ 	if mountpoint -q $dest_dir; then
+ 		kill -9 `fuser -m $dest_dir`
+-- 
+2.11.0
+

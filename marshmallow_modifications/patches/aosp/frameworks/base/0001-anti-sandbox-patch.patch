@@ -1,0 +1,76 @@
+From 88d7511bd8370acfac76129951a5da54df35b3ce Mon Sep 17 00:00:00 2001
+From: Ziyue Yang <yzylivezh@hotmail.com>
+Date: Tue, 20 Jun 2017 13:16:42 +0800
+Subject: [PATCH] anti sandbox patch
+
+---
+ core/java/android/app/ActivityThread.java                          | 4 ++--
+ core/java/android/app/Instrumentation.java                         | 2 +-
+ services/core/java/com/android/server/wm/WindowManagerService.java | 2 +-
+ test-runner/src/android/test/TestRunner.java                       | 2 +-
+ 4 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/core/java/android/app/ActivityThread.java b/core/java/android/app/ActivityThread.java
+index da21eaffa95..7e506b64dd1 100644
+--- a/core/java/android/app/ActivityThread.java
++++ b/core/java/android/app/ActivityThread.java
+@@ -495,7 +495,7 @@ public final class ActivityThread {
+             }
+             try {
+                 VMDebug.startMethodTracing(profileFile, profileFd.getFileDescriptor(),
+-                        8 * 1024 * 1024, 0, samplingInterval != 0, samplingInterval);
++                        64 * 1024 * 1024, 0, samplingInterval != 0, samplingInterval);
+                 profiling = true;
+             } catch (RuntimeException e) {
+                 Slog.w(TAG, "Profiling failed on path " + profileFile);
+@@ -4655,7 +4655,7 @@ public final class ActivityThread {
+                 mProfiler.handlingProfiling = true;
+                 File file = new File(mProfiler.profileFile);
+                 file.getParentFile().mkdirs();
+-                Debug.startMethodTracing(file.toString(), 8 * 1024 * 1024);
++                Debug.startMethodTracing(file.toString(), 64 * 1024 * 1024);
+             }
+ 
+         } else {
+diff --git a/core/java/android/app/Instrumentation.java b/core/java/android/app/Instrumentation.java
+index 69b8b9510b3..548b9a5b611 100644
+--- a/core/java/android/app/Instrumentation.java
++++ b/core/java/android/app/Instrumentation.java
+@@ -284,7 +284,7 @@ public class Instrumentation {
+         if (mThread.isProfiling()) {
+             File file = new File(mThread.getProfileFilePath());
+             file.getParentFile().mkdirs();
+-            Debug.startMethodTracing(file.toString(), 8 * 1024 * 1024);
++            Debug.startMethodTracing(file.toString(), 64 * 1024 * 1024);
+         }
+     }
+ 
+diff --git a/services/core/java/com/android/server/wm/WindowManagerService.java b/services/core/java/com/android/server/wm/WindowManagerService.java
+index d695d936b0d..f60998525d3 100644
+--- a/services/core/java/com/android/server/wm/WindowManagerService.java
++++ b/services/core/java/com/android/server/wm/WindowManagerService.java
+@@ -10815,7 +10815,7 @@ public class WindowManagerService extends IWindowManager.Stub
+ 
+         if (PROFILE_ORIENTATION) {
+             File file = new File("/data/system/frozen");
+-            Debug.startMethodTracing(file.toString(), 8 * 1024 * 1024);
++            Debug.startMethodTracing(file.toString(), 64 * 1024 * 1024);
+         }
+ 
+         if (CUSTOM_SCREEN_ROTATION) {
+diff --git a/test-runner/src/android/test/TestRunner.java b/test-runner/src/android/test/TestRunner.java
+index 012df350102..a8494f922af 100644
+--- a/test-runner/src/android/test/TestRunner.java
++++ b/test-runner/src/android/test/TestRunner.java
+@@ -170,7 +170,7 @@ public class TestRunner implements PerformanceTestCase.Intermediates {
+         File file = new File("/tmp/trace");
+         file.mkdir();
+         String base = "/tmp/trace/" + mClassName + ".dmtrace";
+-        Debug.startMethodTracing(base, 8 * 1024 * 1024);
++        Debug.startMethodTracing(base, 64 * 1024 * 1024);
+     }
+ 
+     public void finishProfiling() {
+-- 
+2.11.0
+

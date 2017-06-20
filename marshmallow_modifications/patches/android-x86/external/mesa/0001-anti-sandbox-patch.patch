@@ -1,0 +1,26 @@
+From 1888aa55a2e82765007282b3535968ba12b5ee8e Mon Sep 17 00:00:00 2001
+From: Ziyue Yang <yzylivezh@hotmail.com>
+Date: Tue, 20 Jun 2017 13:16:42 +0800
+Subject: [PATCH] anti sandbox patch
+
+---
+ src/egl/Android.mk | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/egl/Android.mk b/src/egl/Android.mk
+index d63e71da92..47f1ac78a9 100644
+--- a/src/egl/Android.mk
++++ b/src/egl/Android.mk
+@@ -46,7 +46,8 @@ LOCAL_CFLAGS := \
+ LOCAL_C_INCLUDES := \
+ 	$(MESA_TOP)/src/egl/main \
+ 	$(MESA_TOP)/src/egl/drivers/dri2 \
+-	$(MESA_TOP)/src/gallium/include
++	$(MESA_TOP)/src/gallium/include \
++    system/core/libsync/include
+ 
+ LOCAL_STATIC_LIBRARIES := \
+ 	libmesa_loader
+-- 
+2.11.0
+

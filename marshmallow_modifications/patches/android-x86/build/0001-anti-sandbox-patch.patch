@@ -1,0 +1,23 @@
+From ce078f4dd6387fa90b3471a324ec801e4535252a Mon Sep 17 00:00:00 2001
+From: Ziyue Yang <yzylivezh@hotmail.com>
+Date: Tue, 20 Jun 2017 13:16:42 +0800
+Subject: [PATCH] anti sandbox patch
+
+---
+ core/tasks/check_boot_jars/package_whitelist.txt | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/core/tasks/check_boot_jars/package_whitelist.txt b/core/tasks/check_boot_jars/package_whitelist.txt
+index 4d6261572..f59b73ba2 100644
+--- a/core/tasks/check_boot_jars/package_whitelist.txt
++++ b/core/tasks/check_boot_jars/package_whitelist.txt
+@@ -212,3 +212,6 @@ org\.apache\.xalan\.extensions
+ org\.apache\.xalan\.processor
+ org\.apache\.xalan\.transformer
+ org\.apache\.xalan\.xslt
++
++# fix analytics package
++org\.android_x86\.analytics
+-- 
+2.11.0
+
