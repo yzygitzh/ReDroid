@@ -45,6 +45,8 @@ There are mainly three modules in ReDroid: `anti_sandbox_detector`, `app_samples
 
 ### anti_sandbox_detector
 
+**NOTE: Do check config json contents before using**
+
 1. Run testing script to collect runtime traces on emulator and real device:
 
     `$ python scripts/trace_collector.py -c configs/trace_collector_config.json`
@@ -67,13 +69,16 @@ This module contains some modifications (mainly the expansion of trace log buffe
 * Emulator
 
     1. Apply patches in `android-x86` folder to [Android x86 source][andx86] branch `android-x86-6.0-r3`
-    2. Select the build target as `android_x86-eng`,
-    3. Build the ISO.
+    2. Select the build target as `android_x86-eng`
+    3. Build the ISO
     4. Create a new Virtual Machine in VirtualBox according to the [official documents][andx86_vb], and do some more settings:
-        * `$ VBoxManage setextradata <your_vm_name> "CustomVideoMode1" "768x1280x32"`
-        * `$ VBoxManage modifyvm <your_vm_name> --natpf1 adb,tcp,*,5555,*,5555`
+
+        `$ VBoxManage setextradata <your_vm_name> "CustomVideoMode1" "768x1280x32"`
+
+        `$ VBoxManage modifyvm <your_vm_name> --natpf1 adb,tcp,*,5555,*,5555`
     5. Boot from the ISO in VirtualBox. To enable ADB connection, use
-        * `$ adb connect localhost:5555`
+
+        `$ adb connect localhost:5555`
 
 ### app_samples
 
