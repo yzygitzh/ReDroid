@@ -136,9 +136,17 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path,
             )
     r_idx, e_idx = scipy.optimize.linear_sum_assignment(sim_matrix)
     trace_similarity_list = []
+
+    unmatched_threads = {"real_device": [], "emulator": []}
     for x, y in zip(r_idx, e_idx):
-        real_device_trace = clean_trace(real_device_trace_obj["thread_info"][r_tid_list[x]]["trace"], ex_package_set)
-        emulator_trace = clean_trace(emulator_trace_obj["thread_info"][e_tid_list[y]]["trace"], ex_package_set)
+        real_device_thread = real_device_trace_obj["thread_info"][r_tid_list[x]]
+        emulator_thread = emulator_trace_obj["thread_info"][e_tid_list[y]]
+
+        if -sim_matrix[x][y] < 0.01:
+            continue
+
+        real_device_trace = clean_trace(real_device_thread["trace"], ex_package_set)
+        emulator_trace = clean_trace(emulator_thread["trace"], ex_package_set)
 
         trace_aligned = len(real_device_trace) == 0 or \
                         len(emulator_trace) == 0 or \
@@ -153,10 +161,10 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path,
                     trace_idx += 1
             trace_similarity_list.append({
                 "real_id": r_tid_list[x],
-                "real_name": real_device_trace_obj["thread_info"][r_tid_list[x]]["name"],
+                "real_name": real_device_thread["name"],
                 "real_trace": real_device_trace[max(0, trace_idx - 1):trace_idx + 1] if trace_idx < max_common_len else None,
                 "emu_id": e_tid_list[y],
-                "emu_name": emulator_trace_obj["thread_info"][e_tid_list[y]]["name"],
+                "emu_name": emulator_thread["name"],
                 "emu_trace": emulator_trace[max(0, trace_idx - 1):trace_idx + 1] if trace_idx < max_common_len else None,
                 "sim_cov": -sim_matrix[x][y],
                 "max_common_len": max_common_len,
@@ -164,8 +172,19 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path,
                 "sim_max_common": float(trace_idx) / max_common_len if max_common_len else 1.0
             })
 
+    # collect threads not chosen
+    for (tid, tname) in [(x, real_device_trace_obj["thread_info"][x]["name"]) for x in
+                         set(r_tid_list) - set([y["real_id"] for y in trace_similarity_list])]:
+        unmatched_threads["real_device"].append({"id": tid, "name": tname})
+    for (tid, tname) in [(x, emulator_trace_obj["thread_info"][x]["name"]) for x in
+                         set(e_tid_list) - set([y["emu_id"] for y in trace_similarity_list])]:
+        unmatched_threads["emulator"].append({"id": tid, "name": tname})
+
     with open(output_file_path, "w") as output_file:
-        output_file.write(json.dumps(trace_similarity_list, indent=2))
+        output_file.write(json.dumps({
+            "matched_threads": trace_similarity_list,
+            "unmatched_threads": unmatched_threads
+        }, indent=2))
 
     return "%s written" % output_file_path
 
