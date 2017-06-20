@@ -79,6 +79,11 @@ This module contains some modifications (mainly the expansion of trace log buffe
     5. Boot from the ISO in VirtualBox. To enable ADB connection, use
 
         `$ adb connect localhost:5555`
+    6. Push the `houdini.sfs` in `libs` onto `/sdcard/` folder in the VM. Then in ADB shell, run
+
+        `$ enable_nativebridges`
+
+        This is to enable ARM native code support on x86 VM.
 
 ### app_samples
 
