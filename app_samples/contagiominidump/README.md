@@ -1,0 +1,2 @@
+# Malware dataset from [contagio mobile](http://contagiominidump.blogspot.com/)
+This folder contains automated scripts extracting apks from the dataset. The dataset consists of encrypted zip files, and the password schemes are not provided here.
