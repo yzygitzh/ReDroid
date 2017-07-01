@@ -1,14 +1,16 @@
 {
-    "emulator_id": "emulator-5554",
+    "emulator_id": "192.168.56.101:5555",
     "real_device_id": "06495bbe0ac5b3d1",
-    "apk_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_apps/",
+    "apk_dir": "/mnt/EXT_volume/lab_data/malware_dropbox/extracted/",
+    "timeout": 600,
     "droidbot_args": {
         "-interval": 10,
         "-count": 5,
         "-policy": "bfs",
         "-no_shuffle": "",
         "-grant_perm": "",
-        "-use_method_profiling": "full"
+        "-use_method_profiling": "full",
+        "-dont_tear_down": ""
     },
     "output_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_apps_droidbot_out/"
 }

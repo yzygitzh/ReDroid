@@ -1,11 +1,16 @@
 from multiprocessing import Process
+from threading import Timer
 
 import json
 import os
 import argparse
 import subprocess
 
-def tester_func(device_id, apk_path_list, droidbot_args, output_dir):
+
+def timeout_func(process):
+    process.send_signal(subprocess.signal.SIGINT)
+
+def tester_func(device_id, apk_path_list, droidbot_args, output_dir, timeout):
     """
     test apks on the assigned vm/device
     """
@@ -22,8 +27,11 @@ def tester_func(device_id, apk_path_list, droidbot_args, output_dir):
                         droidbot_args=" ".join(["%s %s" % (x, droidbot_args[x])
                                                 for x in droidbot_args]),
                         output_dir=full_output_dir)
-        subprocess.call(test_cmd.split())
-
+        p = subprocess.Popen(test_cmd.split())
+        t = Timer(timeout, timeout_func, [p])
+        t.start()
+        p.wait()
+        t.cancel()
 
 def run(config_json_path):
     """
@@ -41,12 +49,13 @@ def run(config_json_path):
 
     droidbot_args = config_json["droidbot_args"]
     output_dir = os.path.abspath(config_json["output_dir"])
+    timeout = config_json["timeout"]
 
     # start testers
     emulator_tester = Process(target=tester_func, args=(
-        emulator_id, apk_path_list, droidbot_args, output_dir))
+        emulator_id, apk_path_list, droidbot_args, output_dir, timeout))
     real_device_tester = Process(target=tester_func, args=(
-        real_device_id, apk_path_list, droidbot_args, output_dir))
+        real_device_id, apk_path_list, droidbot_args, output_dir, timeout))
 
     emulator_tester.start()
     real_device_tester.start()
