@@ -1,8 +1,8 @@
 {
     "real_device_droidbot_out_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_apps_droidbot_out/06495bbe0ac5b3d1/",
-    "emulator_droidbot_out_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_apps_droidbot_out/emulator-5554/",
+    "emulator_droidbot_out_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_apps_droidbot_out/192.168.56.101:5555/",
     "output_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_trace_comparator_out/",
-    "process_num": 8,
+    "process_num": 7,
     "irrelevant_packages": {
         "jars": [
             "/mnt/EXT_volume/Android/Sdk/platforms/android-24/android.jar",
@@ -14,7 +14,8 @@
         "names": [
             "com.android.dex",
             "libcore",
-            "org.chromium"
+            "org.chromium",
+            "org.android_x86"
         ],
         "libs": "/mnt/EXT_volume/projects/ReDroid/anti_sandbox_detector/data/lib_packages.csv"
     }

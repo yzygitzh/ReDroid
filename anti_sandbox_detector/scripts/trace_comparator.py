@@ -92,6 +92,8 @@ def trace_similarity(name_a, trace_a, name_b, trace_b):
         class_methods_b.add(trace_str_to_class_method(trace_str))
 
     name_sim = float(len(os.path.commonprefix([name_a, name_b]))) / max(len(name_a), len(name_b))
+    if 0.0 < name_sim < 1.0:
+        name_sim = 0.5
     cov_sim = float(len(class_methods_a & class_methods_b)) / (len(class_methods_a | class_methods_b))
     return name_sim * cov_sim
 
@@ -114,10 +116,12 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path,
     # 2. filter out some irrelevant methods (now using)
     # 3. automatically generate irrelevant methods by repeating dynamic tests
 
-    p = subprocess.Popen(["dmtracedump", "-o", real_device_trace_path], stdout=subprocess.PIPE)
-    real_device_trace_str = p.communicate()[0]
-    p = subprocess.Popen(["dmtracedump", "-o", emulator_trace_path], stdout=subprocess.PIPE)
-    emulator_trace_str = p.communicate()[0]
+    p1 = subprocess.Popen(["dmtracedump", "-o", real_device_trace_path], stdout=subprocess.PIPE)
+    p2 = subprocess.Popen(["dmtracedump", "-o", emulator_trace_path], stdout=subprocess.PIPE)
+    real_device_trace_str = p1.communicate()[0]
+    emulator_trace_str = p2.communicate()[0]
+    if p1.returncode != 0 or p2.returncode != 0:
+        return "%s failed" % output_file_path
 
     real_device_trace_obj = process_trace(real_device_trace_str)
     emulator_trace_obj = process_trace(emulator_trace_str)
@@ -142,8 +146,8 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path,
         real_device_thread = real_device_trace_obj["thread_info"][r_tid_list[x]]
         emulator_thread = emulator_trace_obj["thread_info"][e_tid_list[y]]
 
-        if -sim_matrix[x][y] < 0.01:
-            continue
+        #if -sim_matrix[x][y] < 0.01:
+        #    continue
 
         real_device_trace = clean_trace(real_device_thread["trace"], ex_package_set)
         emulator_trace = clean_trace(emulator_thread["trace"], ex_package_set)
@@ -243,23 +247,29 @@ def run(config_json_path):
         real_device_path = "%s/%s/events" % (real_device_droidbot_out_dir, app_name)
         emulator_path = "%s/%s/events" % (emulator_droidbot_out_dir, app_name)
 
-        real_device_traces = sorted([x for x in os.walk(real_device_path).next()[2]
+        try:
+            real_device_traces = sorted([x for x in os.walk(real_device_path).next()[2]
+                                         if x.endswith(".trace")])
+            emulator_traces = sorted([x for x in os.walk(emulator_path).next()[2]
                                      if x.endswith(".trace")])
-        emulator_traces = sorted([x for x in os.walk(emulator_path).next()[2]
-                                  if x.endswith(".trace")])
 
-        for x, y in zip(real_device_traces, emulator_traces):
-            x_tag = x[len("event_trace_"):-len(".trace")]
-            y_tag = y[len("event_trace_"):-len(".trace")]
-            async_result = pool.apply_async(compare_trace,
-                                            ["%s/%s" % (real_device_path, x),
-                                             "%s/%s" % (emulator_path, y),
-                                             "%s/%s_%s_%s.json" % (output_dir, app_name, x_tag, y_tag),
-                                             ex_package_set])
-            result_list.append(async_result)
+            for x, y in zip(real_device_traces, emulator_traces):
+                x_tag = x[len("event_trace_"):-len(".trace")]
+                y_tag = y[len("event_trace_"):-len(".trace")]
+                async_result = pool.apply_async(compare_trace,
+                                                ["%s/%s" % (real_device_path, x),
+                                                 "%s/%s" % (emulator_path, y),
+                                                 "%s/%s_%s_%s.json" % (output_dir, app_name, x_tag, y_tag),
+                                                 ex_package_set])
+                result_list.append(async_result)
+        except Exception as e:
+            print e
 
     for async_result in result_list:
-        print async_result.get()
+        try:
+            print async_result.get()
+        except Exception as e:
+            print e
 
     pool.close()
     pool.join()
