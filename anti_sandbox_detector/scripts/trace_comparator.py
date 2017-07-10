@@ -25,8 +25,10 @@ def trace_str_to_class_method(trace_str):
 
 def clean_trace(trace_list, ex_package_set):
     # Clean irrelevant traces like java.lang, android.view
+    # return trace_list, origin_idx_list
     ret_trace_list = []
-    for trace_str in trace_list:
+    origin_idx_list = []
+    for idx, trace_str in enumerate(trace_list):
         trimmed_trace_str = trace_str_to_class_method(trace_str)
         trace_removed = False
 
@@ -41,8 +43,9 @@ def clean_trace(trace_list, ex_package_set):
                 break
         if not trace_removed:
             ret_trace_list.append(trace_str)
+            origin_idx_list.append(idx)
 
-    return ret_trace_list
+    return ret_trace_list, origin_idx_list
 
 
 def process_trace(trace_str):
@@ -149,8 +152,9 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path,
         #if -sim_matrix[x][y] < 0.01:
         #    continue
 
-        real_device_trace = clean_trace(real_device_thread["trace"], ex_package_set)
-        emulator_trace = clean_trace(emulator_thread["trace"], ex_package_set)
+        # divergence point finding
+        real_device_trace, real_idx = clean_trace(real_device_thread["trace"], ex_package_set)
+        emulator_trace, emu_idx = clean_trace(emulator_thread["trace"], ex_package_set)
 
         trace_aligned = len(real_device_trace) == 0 or \
                         len(emulator_trace) == 0 or \
@@ -163,7 +167,7 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path,
                     break
                 else:
                     trace_idx += 1
-            trace_similarity_list.append({
+            trace_similarity_info = {
                 "real_id": r_tid_list[x],
                 "real_name": real_device_thread["name"],
                 "real_trace": real_device_trace[max(0, trace_idx - 1):trace_idx + 1] if trace_idx < max_common_len else None,
@@ -174,15 +178,41 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path,
                 "max_common_len": max_common_len,
                 "diverge_idx": trace_idx,
                 "sim_max_common": float(trace_idx) / max_common_len if max_common_len else 1.0
-            })
+            }
+
+            # api finding
+            # method calls before the divering custom method
+            if len(real_idx) > 0:
+                real_api_list = real_device_thread["trace"][:real_idx[trace_idx]]
+            else:
+                real_api_list = real_device_thread["trace"]
+            trace_similarity_info["real_api"] = sorted(list(set([trace_str_to_class_method(x) for x in real_api_list])))
+
+            if len(emu_idx) > 0:
+                emu_api_list = emulator_thread["trace"][:emu_idx[trace_idx]]
+            else:
+                emu_api_list = emulator_thread["trace"]
+            trace_similarity_info["emu_api"] = sorted(list(set([trace_str_to_class_method(x) for x in emu_api_list])))
+
+            trace_similarity_list.append(trace_similarity_info)
 
     # collect threads not chosen
     for (tid, tname) in [(x, real_device_trace_obj["thread_info"][x]["name"]) for x in
                          set(r_tid_list) - set([y["real_id"] for y in trace_similarity_list])]:
-        unmatched_threads["real_device"].append({"id": tid, "name": tname})
+        unmatched_threads["real_device"].append({
+            "id": tid,
+            "name": tname,
+            "api": sorted(list(set([trace_str_to_class_method(x)
+                                    for x in real_device_trace_obj["thread_info"][tid]["trace"]])))
+        })
     for (tid, tname) in [(x, emulator_trace_obj["thread_info"][x]["name"]) for x in
                          set(e_tid_list) - set([y["emu_id"] for y in trace_similarity_list])]:
-        unmatched_threads["emulator"].append({"id": tid, "name": tname})
+        unmatched_threads["emulator"].append({
+            "id": tid,
+            "name": tname,
+            "api": sorted(list(set([trace_str_to_class_method(x)
+                                    for x in emulator_trace_obj["thread_info"][tid]["trace"]])))
+        })
 
     with open(output_file_path, "w") as output_file:
         output_file.write(json.dumps({
