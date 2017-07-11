@@ -28,7 +28,7 @@ def clean_trace(trace_list, ex_package_set):
     # return trace_list, origin_idx_list
     ret_trace_list = []
     origin_idx_list = []
-    for idx, trace_str in enumerate(trace_list):
+    for trace_origin_idx, trace_str in enumerate(trace_list):
         trimmed_trace_str = trace_str_to_class_method(trace_str)
         trace_removed = False
 
@@ -43,7 +43,7 @@ def clean_trace(trace_list, ex_package_set):
                 break
         if not trace_removed:
             ret_trace_list.append(trace_str)
-            origin_idx_list.append(idx)
+            origin_idx_list.append(trace_origin_idx)
 
     return ret_trace_list, origin_idx_list
 
@@ -177,22 +177,20 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path,
                 "sim_cov": -sim_matrix[x][y],
                 "max_common_len": max_common_len,
                 "diverge_idx": trace_idx,
-                "sim_max_common": float(trace_idx) / max_common_len if max_common_len else 1.0
+                "sim_max_common": float(trace_idx) / max_common_len if max_common_len else 1.0,
+                "real_api": None,
+                "emu_api": None
             }
 
             # api finding
             # method calls before the divering custom method
-            if len(real_idx) > 0:
+            if trace_similarity_info["real_trace"] is not None:
                 real_api_list = real_device_thread["trace"][:real_idx[trace_idx]]
-            else:
-                real_api_list = real_device_thread["trace"]
-            trace_similarity_info["real_api"] = sorted(list(set([trace_str_to_class_method(x) for x in real_api_list])))
+                trace_similarity_info["real_api"] = sorted(list(set([trace_str_to_class_method(x) for x in real_api_list])))
 
-            if len(emu_idx) > 0:
+            if trace_similarity_info["emu_trace"] is not None:
                 emu_api_list = emulator_thread["trace"][:emu_idx[trace_idx]]
-            else:
-                emu_api_list = emulator_thread["trace"]
-            trace_similarity_info["emu_api"] = sorted(list(set([trace_str_to_class_method(x) for x in emu_api_list])))
+                trace_similarity_info["emu_api"] = sorted(list(set([trace_str_to_class_method(x) for x in emu_api_list])))
 
             trace_similarity_list.append(trace_similarity_info)
 
