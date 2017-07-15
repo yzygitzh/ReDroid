@@ -1,0 +1,13 @@
+{
+    "real_device_id": "06495bbe0ac5b3d1",
+    "emulator_id": "192.168.56.101:5555",
+    "real_device_droidbot_out_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_apps_droidbot_out_test/06495bbe0ac5b3d1/",
+    "emulator_droidbot_out_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_apps_droidbot_out_test/192.168.56.101:5555/",
+    "trace_comparator_out_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_trace_comparator_out/",
+    "apk_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_apps_test/",
+    "output_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_dsm/monitor",
+    "timeout": 600,
+    "method_white_list": {
+        "a": true
+    }
+}
