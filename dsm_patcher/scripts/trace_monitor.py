@@ -6,7 +6,8 @@ import os
 import argparse
 import subprocess
 
-from utils import ADBException, ADB, java_method_convert
+from adb import ADBException, ADB
+from utils import java_method_convert
 
 
 def get_monitoring_methods(trace_item_list):
@@ -73,20 +74,21 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
         adb = ADB(device_id)
 
         # install the app
-        # print adb.run_cmd(["install", "-r", "-g", apk_path])
+        print adb.run_cmd(["install", "-r", "-g", apk_path])
 
         # set debug-app
+        adb.shell(["am", "set-debug-app", "-w", package_name])
+        # jdwp attach
 
-        # start app
-
-        # fire events
-            # jdwp attach (multiple threads)
+        # event loops
+            # fire events
+            # jdwp set breakpoints
             # freeze, hack debug detection method, resume until last method
-            # jdwp un-attach
+            # jdwp clear breakpoints
             # wait interval seconds
 
         # uninstall the app
-        # print adb.run_cmd(["uninstall", package_name])
+        print adb.run_cmd(["uninstall", package_name])
 
         with open("%s/monitoring_methods.json" % (full_output_dir), "w") as monitoring_methods_file:
             json.dump(monitoring_methods_list, monitoring_methods_file, indent=2)
@@ -121,10 +123,10 @@ def run(config_json_path):
         emulator_id, apk_path_list, emulator_droidbot_out_dir,
         trace_comparator_out_dir, output_dir, timeout, True))
 
-    real_device_monitor.start()
+    # real_device_monitor.start()
     emulator_monitor.start()
 
-    real_device_monitor.join()
+    # real_device_monitor.join()
     emulator_monitor.join()
 
 
