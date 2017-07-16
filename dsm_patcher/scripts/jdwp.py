@@ -1,8 +1,10 @@
 import socket
 import struct
+
 from threading import Thread, Lock, Event
 from Queue import Queue, Empty as EmptyQueue
 
+from utils import parse_return_value
 
 # python  struct pack format
 # c    char string of length 1    1
@@ -39,7 +41,7 @@ class JDWPConnection(Thread):
 
         self.bindqueue = Queue()
         self.reply_pkt_map = {}
-        self.cmd_pkt_map = {}
+        self.cmd_pkt_queue = Queue()
 
         self.socket_conn = socket.create_connection((addr, port))
         self.next_id = 1
@@ -120,6 +122,12 @@ class JDWPConnection(Thread):
         setattr(self, "referenceTypeIDSize", self.sizes[3])
         setattr(self, "frameIDSize", self.sizes[4])
 
+        print "fieldIDSize: ", self.sizes[0]
+        print "methodIDSize: ", self.sizes[1]
+        print "objectIDSize: ", self.sizes[2]
+        print "threadIDSize: ", self.sizes[2]
+        print "referenceTypeIDSize: ", self.sizes[3]
+        print "frameIDSize: ", self.sizes[4]
         return None
 
     def read_handshake(self):
@@ -182,8 +190,16 @@ class JDWPConnection(Thread):
                 return
             return chan.put((ident, code, data))
         else: # command packets are buffered
-            print ident, code, data
-            pass
+            self.cmd_pkt_queue.put((ident, code, data))
+
+    def get_cmd_packets(self):
+        ret_list = []
+        while True:
+            try:
+                ret_list.append(self.cmd_pkt_queue.get(False))
+            except EmptyQueue:
+                break
+        return ret_list
 
     def acquire_ident(self):
         """
@@ -258,9 +274,11 @@ class JDWPConnection(Thread):
         self.join(timeout=self.THREAD_JOIN_TIMEOUT)
 
 class JDWPHelper():
-    EVENTKIND_METHOD_EXIT_WITH_RETURN_VALUE = 42
+    EVENT_METHOD_EXIT_WITH_RETURN_VALUE = 42
     EVENTREQUEST_MODKIND_CLASSMATCH = 5
     SUSPEND_NONE = 0
+
+    LEN_METHOD_EXIT_WITH_RETURN_VALUE_HEADER = 43
 
     def __init__(self, jdwp_connection):
         self.jdwp_connection = jdwp_connection
@@ -275,18 +293,44 @@ class JDWPHelper():
 
     def EventRequest_Set_METHOD_EXIT_WITH_RETURN_VALUE(self, class_list):
         cmd = 0x0f01
-        event_kind = self.EVENTKIND_METHOD_EXIT_WITH_RETURN_VALUE
+        event_kind = self.EVENT_METHOD_EXIT_WITH_RETURN_VALUE
         suspend_policy = self.SUSPEND_NONE
-        modifiers = len(class_list)
+        modifiers = 1
+        header_data = struct.pack(">BBI", event_kind, suspend_policy, modifiers)
 
-        modifier_list = []
-        for class_name in class_list:
-            class_name_utf8 = unicode(class_name).encode("utf-8")
-            modifier_list.append(struct.pack(">BI%ds" % (len(class_name_utf8)),
-                                 self.EVENTREQUEST_MODKIND_CLASSMATCH,
-                                 len(class_name_utf8), class_name_utf8))
+        ret_list = []
+        for class_pattern in class_list:
+            class_pattern_utf8 = unicode(class_pattern).encode("utf-8")
+            modifier_data = struct.pack(">BI%ds" % (len(class_pattern_utf8)),
+                                        self.EVENTREQUEST_MODKIND_CLASSMATCH,
+                                        len(class_pattern_utf8), class_pattern_utf8)
+            data = header_data + modifier_data
+            ret_list.append(self.jdwp_connection.request(cmd, data))
 
-        header = struct.pack(">BBI", event_kind, suspend_policy, modifiers)
-        data = header + "".join(modifier_list)
-        return self.jdwp_connection.request(cmd, data)
+        return ret_list
 
+    def parse_cmd_packets(self, cmd_packets):
+        for cmd_packet in cmd_packets:
+            ident, code, data = cmd_packet
+            """
+            print "========================================"
+            print "id: ", hex(ident)
+            print "command: ", hex(code)
+            """
+            parsed_header = struct.unpack(">BIBIQBQQQ", data[:self.LEN_METHOD_EXIT_WITH_RETURN_VALUE_HEADER])
+            """
+            print "suspendPolicy: ", hex(parsed_header[0])
+            print "events: ", hex(parsed_header[1])
+            print "eventKind: ", hex(parsed_header[2])
+            print "requestID: ", hex(parsed_header[3])
+            print "thread: ", hex(parsed_header[4])
+            print "type tag: ", hex(parsed_header[5])
+            print "classID: ", hex(parsed_header[6])
+            print "methodID: ", hex(parsed_header[7])
+            print "location in method: ", hex(parsed_header[8])
+            """
+            ret_data = data[self.LEN_METHOD_EXIT_WITH_RETURN_VALUE_HEADER:]
+            print parse_return_value(ret_data)
+            """
+            print "========================================"
+            """
