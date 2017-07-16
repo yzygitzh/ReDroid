@@ -6,8 +6,9 @@ import os
 import argparse
 import subprocess
 
-from adb import ADBException, ADB
+from adb import ADBException, ADBConnection
 from utils import java_method_convert
+from jdwp import JDWPConnection
 
 
 def get_monitoring_methods(trace_item_list):
@@ -52,12 +53,9 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
         for comparator_result_path in comparator_result_paths:
             with open(comparator_result_path, "r") as comparator_result_file:
                 comparator_result = json.load(comparator_result_file)
-                if is_emulator:
-                    unmatched_idx = "emulator"
-                    matched_idx = "emu_api"
-                else:
-                    unmatched_idx = "real_device"
-                    matched_idx = "real_api"
+
+                unmatched_idx = "emulator" if is_emulator else "real_device"
+                matched_idx = "emu_api" if is_emulator else "real_api"
 
                 monitoring_methods = set()
                 for thread_info in comparator_result["unmatched_threads"][unmatched_idx]:
@@ -71,14 +69,23 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
                 print len(monitoring_methods_list[-1])
 
         # intialize ADB
-        adb = ADB(device_id)
+        adb = ADBConnection(device_id)
 
         # install the app
         print adb.run_cmd(["install", "-r", "-g", apk_path])
 
         # set debug-app
-        adb.shell(["am", "set-debug-app", "-w", package_name])
+        print adb.shell(["am", "set-debug-app", "-w", package_name])
+        # start app
+        print adb.shell(["am", "start", "diff.strazzere.anti/diff.strazzere.anti.MainActivity"])
         # jdwp attach
+        app_pid = adb.get_app_pid(package_name)
+        print "%s pid=%d" % (package_name, app_pid)
+        port = 7335 if is_emulator else 7336
+        print adb.forward(app_pid, port)
+
+        jdwp = JDWPConnection("localhost", port, trace=True)
+        jdwp.start()
 
         # event loops
             # fire events
@@ -86,6 +93,9 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
             # freeze, hack debug detection method, resume until last method
             # jdwp clear breakpoints
             # wait interval seconds
+
+        # jdwp unattach
+        jdwp.stop()
 
         # uninstall the app
         print adb.run_cmd(["uninstall", package_name])

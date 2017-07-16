@@ -10,7 +10,7 @@ class ADBException(Exception):
     pass
 
 
-class ADB():
+class ADBConnection():
     """
     interface of ADB
     """
@@ -88,3 +88,25 @@ class ADB():
     def touch(self, x, y):
         self.shell("input tap %d %d" % (x, y))
 
+    def install(self, apk_path):
+        return self.run_cmd(["install", "-r", "-g", apk_path])
+
+    def uninstall(self, package_name):
+        return self.run_cmd(["uninstall", package_name])
+
+    def set_debug_app(self, package_name):
+        return self.shell(["am", "set-debug-app", "-w", package_name])
+
+    def get_app_pid(self, target_package_name):
+        ps_out = self.shell(["ps", "-t"])
+        ps_lines = ps_out.splitlines()
+        for ps_line in ps_lines[1:]:
+            fields = ps_line.split()
+            pid = int(fields[1])
+            package_name = fields[-1]
+            if target_package_name == package_name:
+                return pid
+        return -1
+
+    def forward(self, pid, port):
+        return self.run_cmd(["forward", "tcp:%s" % str(port), "jdwp:%s" % str(pid)])
