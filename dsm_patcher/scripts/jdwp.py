@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 import socket
 import struct
 from threading import Thread, Lock, Event
@@ -185,6 +182,7 @@ class JDWPConnection(Thread):
                 return
             return chan.put((ident, code, data))
         else: # command packets are buffered
+            print ident, code, data
             pass
 
     def acquire_ident(self):
@@ -218,7 +216,7 @@ class JDWPConnection(Thread):
         try:
             return queue.get(1, timeout)
         except EmptyQueue:
-            return None, None
+            return None, None, None
 
     def start(self):
         """
@@ -260,5 +258,35 @@ class JDWPConnection(Thread):
         self.join(timeout=self.THREAD_JOIN_TIMEOUT)
 
 class JDWPHelper():
-    def __init__(self):
-        pass
+    EVENTKIND_METHOD_EXIT_WITH_RETURN_VALUE = 42
+    EVENTREQUEST_MODKIND_CLASSMATCH = 5
+    SUSPEND_NONE = 0
+
+    def __init__(self, jdwp_connection):
+        self.jdwp_connection = jdwp_connection
+
+    def VirtualMachine_Version(self):
+        cmd = 0x0101
+        return self.jdwp_connection.request(cmd)
+
+    def VirtualMachine_Resume(self):
+        cmd = 0x0f09
+        return self.jdwp_connection.request(cmd)
+
+    def EventRequest_Set_METHOD_EXIT_WITH_RETURN_VALUE(self, class_list):
+        cmd = 0x0f01
+        event_kind = self.EVENTKIND_METHOD_EXIT_WITH_RETURN_VALUE
+        suspend_policy = self.SUSPEND_NONE
+        modifiers = len(class_list)
+
+        modifier_list = []
+        for class_name in class_list:
+            class_name_utf8 = unicode(class_name).encode("utf-8")
+            modifier_list.append(struct.pack(">BI%ds" % (len(class_name_utf8)),
+                                 self.EVENTREQUEST_MODKIND_CLASSMATCH,
+                                 len(class_name_utf8), class_name_utf8))
+
+        header = struct.pack(">BBI", event_kind, suspend_policy, modifiers)
+        data = header + "".join(modifier_list)
+        return self.jdwp_connection.request(cmd, data)
+

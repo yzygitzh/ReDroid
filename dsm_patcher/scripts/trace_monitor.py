@@ -3,12 +3,12 @@ from threading import Timer
 
 import json
 import os
+import time
 import argparse
-import subprocess
 
 from adb import ADBException, ADBConnection
 from utils import java_method_convert
-from jdwp import JDWPConnection
+from jdwp import JDWPConnection, JDWPHelper
 
 
 def get_monitoring_methods(trace_item_list):
@@ -84,8 +84,18 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
         port = 7335 if is_emulator else 7336
         print adb.forward(app_pid, port)
 
-        jdwp = JDWPConnection("localhost", port, trace=True)
+        jdwp = JDWPConnection("localhost", port)
         jdwp.start()
+
+        jdwp_helper = JDWPHelper(jdwp)
+        cmd_result = jdwp_helper.VirtualMachine_Version()
+        print cmd_result
+        cmd_result = jdwp_helper.EventRequest_Set_METHOD_EXIT_WITH_RETURN_VALUE(["diff.strazzere.anti.MainActivity"])
+        print cmd_result
+        cmd_result = jdwp_helper.VirtualMachine_Resume()
+        print cmd_result
+
+        time.sleep(5)
 
         # event loops
             # fire events
