@@ -1,5 +1,7 @@
+import json
 import socket
 import struct
+import time
 
 from threading import Thread, Lock, Event
 from Queue import Queue, Empty as EmptyQueue
@@ -10,6 +12,7 @@ from Queue import Queue, Empty as EmptyQueue
 # H    unsigned short    integer    2
 # I    unsigned long    integer    4
 # Q    unsigned long long    integer 8
+# TODO: assemble (un)pack strings with results from id command
 
 class EOF(Exception):
     def __init__(self, inner=None):
@@ -28,7 +31,6 @@ class ProtocolError(Exception):
 
 class JDWPConnection(Thread):
     JDWP_HEADER_SIZE = 11
-    THREAD_JOIN_TIMEOUT = 0.02
     CMD_PKT = '0'
     REPLY_PKT = '1'
     REPLY_PACKET_TYPE = 0x80
@@ -268,8 +270,8 @@ class JDWPConnection(Thread):
         Stop the jdwp processing
         """
         self.stop_flag.set()
+        self.join()
         self.close()
-        self.join(timeout=self.THREAD_JOIN_TIMEOUT)
 
 class JDWPHelper():
     EVENT_METHOD_EXIT_WITH_RETURN_VALUE = 42
@@ -289,23 +291,30 @@ class JDWPHelper():
         cmd = 0x0f09
         return self.jdwp_connection.request(cmd)
 
-    def EventRequest_Set_METHOD_EXIT_WITH_RETURN_VALUE(self, class_list):
+    def EventRequest_Set_METHOD_EXIT_WITH_RETURN_VALUE(self, class_pattern):
         cmd = 0x0f01
         event_kind = self.EVENT_METHOD_EXIT_WITH_RETURN_VALUE
         suspend_policy = self.SUSPEND_NONE
         modifiers = 1
         header_data = struct.pack(">BBI", event_kind, suspend_policy, modifiers)
 
-        ret_list = []
-        for class_pattern in class_list:
-            class_pattern_utf8 = unicode(class_pattern).encode("utf-8")
-            modifier_data = struct.pack(">BI%ds" % (len(class_pattern_utf8)),
-                                        self.EVENTREQUEST_MODKIND_CLASSMATCH,
-                                        len(class_pattern_utf8), class_pattern_utf8)
-            data = header_data + modifier_data
-            ret_list.append(self.jdwp_connection.request(cmd, data))
+        class_pattern_utf8 = unicode(class_pattern).encode("utf-8")
+        modifier_data = struct.pack(">BI%ds" % (len(class_pattern_utf8)),
+                                    self.EVENTREQUEST_MODKIND_CLASSMATCH,
+                                    len(class_pattern_utf8), class_pattern_utf8)
 
-        return ret_list
+        data = header_data + modifier_data
+        return self.jdwp_connection.request(cmd, data)
+
+    def ReferenceType_Methods(self, ref_id):
+        cmd = 0x0205
+        header_data = struct.pack(">Q", ref_id)
+        return self.jdwp_connection.request(cmd, header_data)
+
+    def ReferenceType_Signature(self, ref_id):
+        cmd = 0x0201
+        header_data = struct.pack(">Q", ref_id)
+        return self.jdwp_connection.request(cmd, header_data)
 
     def parse_return_value(self, return_value):
         basic_parser = {
@@ -333,24 +342,84 @@ class JDWPHelper():
         else:
             return basic_parser[return_value[0]](return_value[1:])
 
+    def build_class_method_mapping(self, class_id_list):
+        """
+        mapping = {
+            "classId": {
+                "className": "class1"
+                "methods": {
+                    "methodId": {
+                        "name": "methodName",
+                        "signature: "methodSig"
+                    }
+                }
+            }
+        }
+        """
+        ret_dict = {}
+        print sorted(class_id_list)
+        for class_id in sorted(class_id_list):
+            # get class name
+            ident, code, data = self.ReferenceType_Signature(class_id)
+            class_sig_len = struct.unpack(">I", data[:4])[0]
+            class_sig = struct.unpack(">%ds" % class_sig_len, data[4:])[0]
+            ret_dict[hex(class_id)] = {
+                "className": class_sig[len("L"):-len(";")].replace("/", "."),
+                "methods": {}
+            }
+            # get method name
+            ident, code, data = self.ReferenceType_Methods(class_id)
+            declared = struct.unpack(">I", data[:4])[0]
+            declared_offset = 4
+            for i in range(declared):
+                method_id = struct.unpack(">Q", data[declared_offset:declared_offset + 8])[0]
+                declared_offset += self.jdwp_connection.methodIDSize
+                name_len = struct.unpack(">I", data[declared_offset:declared_offset + 4])[0]
+                declared_offset += 4
+                name = struct.unpack(">%ds" % name_len, data[declared_offset:declared_offset + name_len])[0]
+                declared_offset += name_len
+                signature_len = struct.unpack(">I", data[declared_offset:declared_offset + 4])[0]
+                declared_offset += 4
+                signature = struct.unpack(">%ds" % signature_len, data[declared_offset:declared_offset + signature_len])[0]
+                # add mod bits as well
+                declared_offset += signature_len + 4
 
+                ret_dict[hex(class_id)]["methods"][hex(method_id)] = {
+                    "name": name,
+                    "signature": signature
+                }
+
+        return ret_dict
 
     def parse_cmd_packets(self, cmd_packets):
+        ret_list = []
+        class_id_set = set()
         for cmd_packet in cmd_packets:
             ident, code, data = cmd_packet
-            print "========================================"
-            print "id: ", hex(ident)
-            print "command: ", hex(code)
             parsed_header = struct.unpack(">BIBIQBQQQ", data[:self.LEN_METHOD_EXIT_WITH_RETURN_VALUE_HEADER])
-            print "suspendPolicy: ", hex(parsed_header[0])
-            print "events: ", hex(parsed_header[1])
-            print "eventKind: ", hex(parsed_header[2])
-            print "requestID: ", hex(parsed_header[3])
-            print "thread: ", hex(parsed_header[4])
-            print "type tag: ", hex(parsed_header[5])
-            print "classID: ", hex(parsed_header[6])
-            print "methodID: ", hex(parsed_header[7])
-            print "location in method: ", hex(parsed_header[8])
-            ret_data = data[self.LEN_METHOD_EXIT_WITH_RETURN_VALUE_HEADER:]
-            print self.parse_return_value(ret_data)
-            print "========================================"
+            ret_data = self.parse_return_value(data[self.LEN_METHOD_EXIT_WITH_RETURN_VALUE_HEADER:])
+            ret_list.append({
+                "id": hex(ident),
+                "command": hex(code),
+                "suspendPolicy": hex(parsed_header[0]),
+                "events": hex(parsed_header[1]),
+                "eventKind": hex(parsed_header[2]),
+                "requestID": hex(parsed_header[3]),
+                "thread": hex(parsed_header[4]),
+                "typeTag": hex(parsed_header[5]),
+                "classID": hex(parsed_header[6]),
+                "methodID": hex(parsed_header[7]),
+                "methodLocation": hex(parsed_header[8]),
+                "returnType": ret_data[0],
+                "returnValue": ret_data[1]
+            })
+            class_id_set.add(parsed_header[6])
+
+        class_method_mapping = self.build_class_method_mapping(list(class_id_set))
+        for parsed_packet in ret_list:
+            class_name = class_method_mapping[parsed_packet["classID"]]["className"]
+            method_info = class_method_mapping[parsed_packet["classID"]]["methods"][parsed_packet["methodID"]]
+            parsed_packet["classMethodName"] = ".".join([class_name, method_info["name"]])
+            parsed_packet["signature"] = method_info["signature"]
+
+        return ret_list

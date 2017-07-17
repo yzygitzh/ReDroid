@@ -72,17 +72,17 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
         jdwp.start()
 
         jdwp_helper = JDWPHelper(jdwp)
-        cmd_result = jdwp_helper.VirtualMachine_Version()
-        print cmd_result
+        print jdwp_helper.VirtualMachine_Version()
+
         class_list = extract_method_classes(monitoring_methods_list[0])
-        cmd_result = jdwp_helper.EventRequest_Set_METHOD_EXIT_WITH_RETURN_VALUE(class_list)
-        print cmd_result
-        cmd_result = jdwp_helper.VirtualMachine_Resume()
-        print cmd_result
+        for class_pattern in class_list:
+            print jdwp_helper.EventRequest_Set_METHOD_EXIT_WITH_RETURN_VALUE(class_pattern)
+
+        print jdwp_helper.VirtualMachine_Resume()
 
         time.sleep(5)
 
-        jdwp_helper.parse_cmd_packets(jdwp.get_cmd_packets())
+        trace_result = jdwp_helper.parse_cmd_packets(jdwp.get_cmd_packets())
 
         # event loops
             # fire events
@@ -102,6 +102,9 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
 
         with open("%s/monitoring_classes.json" % (full_output_dir), "w") as monitoring_classes_file:
             json.dump(class_list, monitoring_classes_file, indent=2)
+
+        with open("%s/trace_result.json" % (full_output_dir), "w") as trace_result_file:
+            json.dump(trace_result, trace_result_file, indent=2)
 
 
 def run(config_json_path):
