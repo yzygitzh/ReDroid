@@ -4,8 +4,6 @@ import struct
 from threading import Thread, Lock, Event
 from Queue import Queue, Empty as EmptyQueue
 
-from utils import parse_return_value
-
 # python  struct pack format
 # c    char string of length 1    1
 # B    unsigned char    integer    1
@@ -309,16 +307,41 @@ class JDWPHelper():
 
         return ret_list
 
+    def parse_return_value(self, return_value):
+        basic_parser = {
+            "Z": lambda x: ("boolean", struct.unpack(">?", x)[0]),
+            "B": lambda x: ("byte", chr(struct.unpack(">B", x)[0])),
+            "C": lambda x: ("unicode", unicode(x)),
+            "S": lambda x: ("short", struct.unpack(">h", x)[0]),
+            "I": lambda x: ("int", struct.unpack(">i", x)[0]),
+            "J": lambda x: ("long", struct.unpack(">q", x)[0]),
+            "F": lambda x: ("float", struct.unpack(">f", x)[0]),
+            "D": lambda x: ("double", struct.unpack(">d", x)[0]),
+
+            "[": lambda x: ("array", struct.unpack(">Q", x)[0]),
+            "L": lambda x: ("object", struct.unpack(">Q", x)[0]),
+            "s": lambda x: ("string", struct.unpack(">Q", x)[0]),
+            "t": lambda x: ("thread", struct.unpack(">Q", x)[0]),
+            "g": lambda x: ("thread_group", struct.unpack(">Q", x)[0]),
+            "l": lambda x: ("class_loader", struct.unpack(">Q", x)[0]),
+            "c": lambda x: ("class_object", struct.unpack(">Q", x)[0]),
+
+            "V": lambda x: ("void", None)
+        }
+        if return_value[0] not in basic_parser:
+            return "unknown", return_value
+        else:
+            return basic_parser[return_value[0]](return_value[1:])
+
+
+
     def parse_cmd_packets(self, cmd_packets):
         for cmd_packet in cmd_packets:
             ident, code, data = cmd_packet
-            """
             print "========================================"
             print "id: ", hex(ident)
             print "command: ", hex(code)
-            """
             parsed_header = struct.unpack(">BIBIQBQQQ", data[:self.LEN_METHOD_EXIT_WITH_RETURN_VALUE_HEADER])
-            """
             print "suspendPolicy: ", hex(parsed_header[0])
             print "events: ", hex(parsed_header[1])
             print "eventKind: ", hex(parsed_header[2])
@@ -328,9 +351,6 @@ class JDWPHelper():
             print "classID: ", hex(parsed_header[6])
             print "methodID: ", hex(parsed_header[7])
             print "location in method: ", hex(parsed_header[8])
-            """
             ret_data = data[self.LEN_METHOD_EXIT_WITH_RETURN_VALUE_HEADER:]
-            print parse_return_value(ret_data)
-            """
+            print self.parse_return_value(ret_data)
             print "========================================"
-            """
