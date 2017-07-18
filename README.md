@@ -59,6 +59,8 @@ There are mainly three modules in ReDroid: `anti_sandbox_detector`, `app_samples
 
 This module contains some modifications (mainly the expansion of trace log buffer) on original Android system, providing more complete trace generated while testing. There are modifications for **real device** and **emulator**.
 
+To simplify usage, [prebuilt images][prebuilt-imgs] are available. Please follow README in it.
+
 * Real Device
 
     1. Apply patches in `aosp` folder to [AOSP source][aosp] branch `android-6.0.1_r77`
@@ -97,3 +99,4 @@ Build them and use them. For `anti-emulator` sample, NDK is necessary.
 [dendroid]: https://github.com/yzygitzh/dendroid_apk
 [libradar]: https://github.com/pkumza/LibRadar
 [andx86_vb]: http://www.android-x86.org/documents/virtualboxhowto
+[prebuilt-imgs]: https://www.dropbox.com/s/wj5nnio77zmgcvq/ReDroid_img.tar.gz?dl=0
