@@ -274,11 +274,12 @@ class JDWPConnection(Thread):
         self.close()
 
 class JDWPHelper():
+    EVENT_METHOD_ENTRY = 40
     EVENT_METHOD_EXIT_WITH_RETURN_VALUE = 42
     EVENTREQUEST_MODKIND_CLASSMATCH = 5
     SUSPEND_NONE = 0
 
-    LEN_METHOD_EXIT_WITH_RETURN_VALUE_HEADER = 43
+    LEN_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE_HEADER = 43
 
     def __init__(self, jdwp_connection):
         self.jdwp_connection = jdwp_connection
@@ -291,20 +292,23 @@ class JDWPHelper():
         cmd = 0x0f09
         return self.jdwp_connection.request(cmd)
 
-    def EventRequest_Set_METHOD_EXIT_WITH_RETURN_VALUE(self, class_pattern):
+    def EventRequest_Set_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE(self, class_pattern):
         cmd = 0x0f01
-        event_kind = self.EVENT_METHOD_EXIT_WITH_RETURN_VALUE
+        entry_event_kind = self.EVENT_METHOD_ENTRY
+        exit_event_kind = self.EVENT_METHOD_EXIT_WITH_RETURN_VALUE
         suspend_policy = self.SUSPEND_NONE
         modifiers = 1
-        header_data = struct.pack(">BBI", event_kind, suspend_policy, modifiers)
 
         class_pattern_utf8 = unicode(class_pattern).encode("utf-8")
         modifier_data = struct.pack(">BI%ds" % (len(class_pattern_utf8)),
                                     self.EVENTREQUEST_MODKIND_CLASSMATCH,
                                     len(class_pattern_utf8), class_pattern_utf8)
 
-        data = header_data + modifier_data
-        return self.jdwp_connection.request(cmd, data)
+        entry_header_data = struct.pack(">BBI", entry_event_kind, suspend_policy, modifiers)
+        exit_header_data = struct.pack(">BBI", exit_event_kind, suspend_policy, modifiers)
+        entry_ret = self.jdwp_connection.request(cmd, entry_header_data + modifier_data)
+        exit_ret = self.jdwp_connection.request(cmd, exit_header_data + modifier_data)
+        return entry_ret, exit_ret
 
     def ReferenceType_Methods(self, ref_id):
         cmd = 0x0205
@@ -396,29 +400,36 @@ class JDWPHelper():
         class_id_set = set()
         for cmd_packet in cmd_packets:
             ident, code, data = cmd_packet
-            parsed_header = struct.unpack(">BIBIQBQQQ", data[:self.LEN_METHOD_EXIT_WITH_RETURN_VALUE_HEADER])
-            ret_data = self.parse_return_value(data[self.LEN_METHOD_EXIT_WITH_RETURN_VALUE_HEADER:])
-            ret_list.append({
-                "id": hex(ident),
-                "command": hex(code),
-                "suspendPolicy": hex(parsed_header[0]),
-                "events": hex(parsed_header[1]),
+            parsed_header = struct.unpack(">BIBIQBQQQ", data[:self.LEN_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE_HEADER])
+
+            parsed_packet = {
+                #"id": hex(ident),
+                #"command": hex(code),
+                #"suspendPolicy": hex(parsed_header[0]),
+                #"events": hex(parsed_header[1]),
                 "eventKind": hex(parsed_header[2]),
-                "requestID": hex(parsed_header[3]),
+                #"requestID": hex(parsed_header[3]),
                 "thread": hex(parsed_header[4]),
-                "typeTag": hex(parsed_header[5]),
+                #"typeTag": hex(parsed_header[5]),
                 "classID": hex(parsed_header[6]),
                 "methodID": hex(parsed_header[7]),
                 "methodLocation": hex(parsed_header[8]),
-                "returnType": ret_data[0],
-                "returnValue": ret_data[1]
-            })
+            }
+
+            if parsed_packet["eventKind"] == hex(self.EVENT_METHOD_EXIT_WITH_RETURN_VALUE):
+                ret_data = self.parse_return_value(data[self.LEN_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE_HEADER:])
+                parsed_packet["returnType"] = ret_data[0]
+                parsed_packet["returnValue"] = ret_data[1]
+
+            ret_list.append(parsed_packet)
             class_id_set.add(parsed_header[6])
 
         class_method_mapping = self.build_class_method_mapping(list(class_id_set))
         for parsed_packet in ret_list:
-            class_name = class_method_mapping[parsed_packet["classID"]]["className"]
-            method_info = class_method_mapping[parsed_packet["classID"]]["methods"][parsed_packet["methodID"]]
+            class_id = parsed_packet.pop("classID")
+            method_id = parsed_packet.pop("methodID")
+            class_name = class_method_mapping[class_id]["className"]
+            method_info = class_method_mapping[class_id]["methods"][method_id]
             parsed_packet["classMethodName"] = ".".join([class_name, method_info["name"]])
             parsed_packet["signature"] = method_info["signature"]
 

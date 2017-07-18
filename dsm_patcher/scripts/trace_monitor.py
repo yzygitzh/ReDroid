@@ -76,7 +76,7 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
 
         class_list = extract_method_classes(monitoring_methods_list[0])
         for class_pattern in class_list:
-            print jdwp_helper.EventRequest_Set_METHOD_EXIT_WITH_RETURN_VALUE(class_pattern)
+            print jdwp_helper.EventRequest_Set_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE(class_pattern)
 
         print jdwp_helper.VirtualMachine_Resume()
 
