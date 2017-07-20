@@ -35,6 +35,7 @@ class JDWPConnection(Thread):
     REPLY_PKT = '1'
     REPLY_PACKET_TYPE = 0x80
     HANDSHAKE_MSG = 'JDWP-Handshake'
+    JOIN_TIMEOUT = 0.2
 
     def __init__(self, addr, port, trace=False):
         Thread.__init__(self)
@@ -48,7 +49,7 @@ class JDWPConnection(Thread):
 
         self.trace = trace
 
-        self.stop_flag = Event()
+        self.unplug_flag = Event()
         self.lock = Lock()
 
     def do_read(self, amt):
@@ -189,7 +190,7 @@ class JDWPConnection(Thread):
             if not chan:
                 return
             return chan.put((ident, code, data))
-        else: # command packets are buffered
+        elif not self.unplug_flag.is_set(): # command packets are buffered
             self.cmd_pkt_queue.put((ident, code, data))
 
     def get_cmd_packets(self):
@@ -234,44 +235,44 @@ class JDWPConnection(Thread):
         except EmptyQueue:
             return None, None, None
 
-    def start(self):
-        """
-        Start the jdwp processing
-        """
-        self.write_handshake()
-        self.read_handshake()
-        self.write_id_size()
-        self.read_id_size()
-        Thread.start(self)
-
     def run(self):
         """
         Thread function for jdwp
         """
         try:
-            while not self.stop_flag.is_set():
+            while True:
                 self.process_data_from_vm()
         except EOF:
-            print "process_data_from_vm done!"
-            pass
+            print "EOF"
 
-    def close(self):
+    def start(self):
         """
-        close the socket connection
+        Start the jdwp connection
+        """
+        self.write_handshake()
+        self.read_handshake()
+        self.write_id_size()
+        self.read_id_size()
+        self.unplug()
+        Thread.start(self)
+
+    def plug(self):
+        self.unplug_flag.clear()
+
+    def unplug(self):
+        self.unplug_flag.set()
+
+    def stop(self):
+        """
+        close the JDWP connection
         """
         try:
+            self.unplug()
+            self.join(timeout=self.JOIN_TIMEOUT)
             self.socket_conn.shutdown(socket.SHUT_RDWR)
             self.socket_conn.close()
         except Exception, e:
             pass
-
-    def stop(self):
-        """
-        Stop the jdwp processing
-        """
-        self.stop_flag.set()
-        self.join()
-        self.close()
 
 class JDWPHelper():
     EVENT_METHOD_ENTRY = 40
@@ -283,10 +284,6 @@ class JDWPHelper():
 
     def __init__(self, jdwp_connection):
         self.jdwp_connection = jdwp_connection
-
-    def VirtualMachine_Version(self):
-        cmd = 0x0101
-        return self.jdwp_connection.request(cmd)
 
     def VirtualMachine_Resume(self):
         cmd = 0x0f09
@@ -308,7 +305,14 @@ class JDWPHelper():
         exit_header_data = struct.pack(">BBI", exit_event_kind, suspend_policy, modifiers)
         entry_ret = self.jdwp_connection.request(cmd, entry_header_data + modifier_data)
         exit_ret = self.jdwp_connection.request(cmd, exit_header_data + modifier_data)
-        return entry_ret, exit_ret
+        # return requestID's
+        return ((entry_event_kind, struct.unpack(">I", entry_ret[2])[0]),
+                (exit_event_kind, struct.unpack(">I", exit_ret[2])[0]))
+
+    def EventRequest_Clear(self, event_kind, request_id):
+        cmd = 0x0f02
+        header_data = struct.pack(">BI", int(event_kind), int(request_id))
+        return self.jdwp_connection.request(cmd, header_data)
 
     def ReferenceType_Methods(self, ref_id):
         cmd = 0x0205
@@ -361,7 +365,6 @@ class JDWPHelper():
         }
         """
         ret_dict = {}
-        print sorted(class_id_list)
         for class_id in sorted(class_id_list):
             # get class name
             ident, code, data = self.ReferenceType_Signature(class_id)

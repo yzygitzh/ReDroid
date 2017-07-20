@@ -50,37 +50,47 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
                         matched_methods = get_monitoring_methods(thread_info[matched_idx])
                         monitoring_methods = monitoring_methods.union(matched_methods)
                 monitoring_methods_list.append(sorted(list(monitoring_methods)))
-                print len(monitoring_methods_list[-1])
 
         # intialize ADB
         adb = ADBConnection(device_id)
 
         # install the app
         print adb.run_cmd(["install", "-r", "-g", apk_path])
-
         # set debug-app
         print adb.shell(["am", "set-debug-app", "-w", package_name])
         # start app
         print adb.shell(["am", "start", "diff.strazzere.anti/diff.strazzere.anti.MainActivity"])
-        # jdwp attach
+        # adb forward
         app_pid = adb.get_app_pid(package_name)
         print "%s pid=%d" % (package_name, app_pid)
         port = 7335 if is_emulator else 7336
         print adb.forward(app_pid, port)
 
+        # jdwp init
         jdwp = JDWPConnection("localhost", port)
+        jdwp_helper = JDWPHelper(jdwp)
+
+        # jdwp attach
         jdwp.start()
 
-        jdwp_helper = JDWPHelper(jdwp)
-        print jdwp_helper.VirtualMachine_Version()
-
+        # prepare classes to listen, and listen to them
         class_list = extract_method_classes(monitoring_methods_list[0])
+        event_ids = []
         for class_pattern in class_list:
-            print jdwp_helper.EventRequest_Set_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE(class_pattern)
+            ent, ext = jdwp_helper.EventRequest_Set_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE(class_pattern)
+            event_ids.append(ent)
+            event_ids.append(ext)
 
+        # start sampling
+        jdwp.plug()
         print jdwp_helper.VirtualMachine_Resume()
 
         time.sleep(5)
+
+        # stop sampling
+        jdwp.unplug()
+        for event_id in event_ids:
+            jdwp_helper.EventRequest_Clear(event_id[0], event_id[1])
 
         trace_result = jdwp_helper.parse_cmd_packets(jdwp.get_cmd_packets())
 
@@ -91,7 +101,7 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
             # jdwp clear breakpoints
             # wait interval seconds
 
-        # jdwp unattach
+        # jdwp un-attach
         jdwp.stop()
 
         # uninstall the app
