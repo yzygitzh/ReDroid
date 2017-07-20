@@ -17,13 +17,13 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
     test apks on the assigned vm/device
     """
     for apk_path in apk_path_list:
-        apk_file_name = apk_path.split("/")[-1][:-len(".apk")]
-        full_output_dir = "%s/%s/%s" % (output_dir, device_id, apk_file_name)
+        apk_label = apk_path.split("/")[-1][:-len(".apk")]
+        full_output_dir = "%s/%s/" % (output_dir, device_id)
         if os.system("mkdir -p %s" % full_output_dir):
             print "failed mkdir -p %s" % full_output_dir
             continue
 
-        app_droidbot_out_dir = "%s/%s" % (droidbot_out_dir, apk_file_name)
+        app_droidbot_out_dir = "%s/%s" % (droidbot_out_dir, apk_label)
 
         # get package name by dumpsys_package file name
         package_name = [x for x in os.walk(app_droidbot_out_dir).next()[2]
@@ -39,7 +39,8 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
         monitoring_methods_list = []
         comparator_result_paths = ["%s/%s" % (trace_comparator_out_dir, x)
                                    for x in os.walk(trace_comparator_out_dir).next()[2]
-                                   if x.startswith(apk_file_name)]
+                                   if x.startswith(apk_label)]
+        comparator_result_labels = [x.split("/")[-1][:-len(".json")] for x in comparator_result_paths]
         for comparator_result_path in comparator_result_paths:
             with open(comparator_result_path, "r") as comparator_result_file:
                 comparator_result = json.load(comparator_result_file)
@@ -78,12 +79,7 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
         # jdwp attach
         jdwp.start()
 
-        # event loops
-            # fire events
-            # jdwp set breakpoints
-            # freeze, hack debug detection method, resume until last method
-            # jdwp clear breakpoints
-            # wait interval seconds
+        trace_result = []
 
         for event_idx, monitoring_methods in enumerate(monitoring_methods_list):
             print droidbot_events[event_idx]
@@ -120,23 +116,16 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
             for event_id in event_ids:
                 jdwp_helper.EventRequest_Clear(event_id[0], event_id[1])
 
-            trace_result = jdwp_helper.parse_cmd_packets(jdwp.get_cmd_packets())
+            trace_result.append(jdwp_helper.parse_cmd_packets(jdwp.get_cmd_packets()))
+
+            with open("%s/%s.json" % (full_output_dir, comparator_result_labels[event_idx]), "w") as trace_result_file:
+                json.dump(trace_result[event_idx], trace_result_file, indent=2)
 
         # jdwp un-attach
         jdwp.stop()
 
         # uninstall the app
         adb.run_cmd(["uninstall", package_name])
-
-        with open("%s/monitoring_methods.json" % (full_output_dir), "w") as monitoring_methods_file:
-            json.dump(monitoring_methods_list, monitoring_methods_file, indent=2)
-
-        with open("%s/monitoring_classes.json" % (full_output_dir), "w") as monitoring_classes_file:
-            json.dump(class_list, monitoring_classes_file, indent=2)
-
-        with open("%s/trace_result.json" % (full_output_dir), "w") as trace_result_file:
-            json.dump(trace_result, trace_result_file, indent=2)
-
 
 def run(config_json_path):
     """
