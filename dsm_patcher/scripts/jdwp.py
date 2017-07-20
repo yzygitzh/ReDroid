@@ -122,13 +122,6 @@ class JDWPConnection(Thread):
         setattr(self, "threadIDSize", self.sizes[2])
         setattr(self, "referenceTypeIDSize", self.sizes[3])
         setattr(self, "frameIDSize", self.sizes[4])
-
-        print "fieldIDSize: ", self.sizes[0]
-        print "methodIDSize: ", self.sizes[1]
-        print "objectIDSize: ", self.sizes[2]
-        print "threadIDSize: ", self.sizes[2]
-        print "referenceTypeIDSize: ", self.sizes[3]
-        print "frameIDSize: ", self.sizes[4]
         return None
 
     def read_handshake(self):
@@ -287,6 +280,10 @@ class JDWPHelper():
 
     def VirtualMachine_Resume(self):
         cmd = 0x0f09
+        return self.jdwp_connection.request(cmd)
+
+    def VirtualMachine_Suspend(self):
+        cmd = 0x0f08
         return self.jdwp_connection.request(cmd)
 
     def EventRequest_Set_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE(self, class_pattern):

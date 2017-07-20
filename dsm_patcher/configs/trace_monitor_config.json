@@ -6,7 +6,8 @@
     "trace_comparator_out_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_trace_comparator_out/",
     "apk_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_apps_test/",
     "output_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_dsm/monitor",
-    "interval": 30,
+    "tracing_interval": 3,
+    "interval": 3,
     "timeout": 600,
     "method_white_list": {
         "a": true
