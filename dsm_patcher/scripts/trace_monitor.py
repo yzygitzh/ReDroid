@@ -160,10 +160,10 @@ def run(config_json_path):
         trace_comparator_out_dir, output_dir,
         timeout, tracing_interval, interval, True))
 
-    # real_device_monitor.start()
+    real_device_monitor.start()
     emulator_monitor.start()
 
-    # real_device_monitor.join()
+    real_device_monitor.join()
     emulator_monitor.join()
 
 
