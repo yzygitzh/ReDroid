@@ -29,13 +29,22 @@ class HandshakeError(Exception):
 class ProtocolError(Exception):
     pass
 
+
+JDWP_HEADER_SIZE = 11
+CMD_PKT = '0'
+REPLY_PKT = '1'
+REPLY_PACKET_TYPE = 0x80
+HANDSHAKE_MSG = 'JDWP-Handshake'
+JOIN_TIMEOUT = 0.2
+
+EVENT_METHOD_ENTRY = 40
+EVENT_METHOD_EXIT_WITH_RETURN_VALUE = 42
+EVENTREQUEST_MODKIND_CLASSMATCH = 5
+SUSPEND_NONE = 0
+
+LEN_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE_HEADER = 43
+
 class JDWPConnection(Thread):
-    JDWP_HEADER_SIZE = 11
-    CMD_PKT = '0'
-    REPLY_PKT = '1'
-    REPLY_PACKET_TYPE = 0x80
-    HANDSHAKE_MSG = 'JDWP-Handshake'
-    JOIN_TIMEOUT = 0.2
 
     def __init__(self, addr, port, trace=False):
         Thread.__init__(self)
@@ -94,7 +103,7 @@ class JDWPConnection(Thread):
         """
         Send the id size cmd to the VM
         """
-        length = self.JDWP_HEADER_SIZE
+        length = JDWP_HEADER_SIZE
         ident = self.acquire_ident()
         flags  = 0
         cmd = 0x0107
@@ -106,9 +115,9 @@ class JDWPConnection(Thread):
         Parse the read id size result
         """
         head = self.read_header()
-        if head[0] != 20 + self.JDWP_HEADER_SIZE:
+        if head[0] != 20 + JDWP_HEADER_SIZE:
             raise ProtocolError('expected size of an idsize response')
-        if head[2] != self.REPLY_PACKET_TYPE:
+        if head[2] != REPLY_PACKET_TYPE:
             raise ProtocolError('expected first server message to be a response')
         if head[1] != 1:
             raise ProtocolError('expected first server message to be 1')
@@ -128,21 +137,21 @@ class JDWPConnection(Thread):
         """
         Read the jdwp handshake
         """
-        data = self.read(len(self.HANDSHAKE_MSG))
-        if data != self.HANDSHAKE_MSG:
+        data = self.read(len(HANDSHAKE_MSG))
+        if data != HANDSHAKE_MSG:
             raise HandshakeError()
 
     def write_handshake(self):
         """
         Write the jdwp handshake
         """
-        return self.do_write(self.HANDSHAKE_MSG)
+        return self.do_write(HANDSHAKE_MSG)
 
     def read_header(self):
         """
         Read the header
         """
-        header = self.read(self.JDWP_HEADER_SIZE)
+        header = self.read(JDWP_HEADER_SIZE)
         data = struct.unpack(">IIBH", header)
         return data
 
@@ -152,7 +161,7 @@ class JDWPConnection(Thread):
         Debugger and VM's request initated by the VM
         """
         size, ident, flags, code = self.read_header()
-        size -= self.JDWP_HEADER_SIZE
+        size -= JDWP_HEADER_SIZE
         data = self.read(size)
         try:
             # We process binds after receiving messages to prevent a race
@@ -167,10 +176,10 @@ class JDWPConnection(Thread):
 
     def set_bind(self, pkt_type, ident, chan):
         """
-        Bind the queue for self.REPLY_PKT
-        not for self.CMD_PKT, they're buffered
+        Bind the queue for REPLY_PKT
+        not for CMD_PKT, they're buffered
         """
-        if pkt_type == self.REPLY_PKT:
+        if pkt_type == REPLY_PKT:
             self.reply_pkt_map[ident] = chan
 
     def process_packet(self, ident, code, data, flags):
@@ -178,7 +187,7 @@ class JDWPConnection(Thread):
         Handle packets from VM
         """
         # reply pkt shows only once
-        if flags == self.REPLY_PACKET_TYPE:
+        if flags == REPLY_PACKET_TYPE:
             chan = self.reply_pkt_map.get(ident)
             if not chan:
                 return
@@ -207,7 +216,7 @@ class JDWPConnection(Thread):
         """
         Write the request data to jdwp
         """
-        size = len(body) + self.JDWP_HEADER_SIZE
+        size = len(body) + JDWP_HEADER_SIZE
         header = struct.pack(">IIcH", size, ident, flags, code)
         self.do_write(header)
         return self.do_write(body)
@@ -221,7 +230,7 @@ class JDWPConnection(Thread):
         queue = Queue()
         with self.lock:
             ident = self.acquire_ident()
-            self.bindqueue.put((self.REPLY_PKT, ident, queue))
+            self.bindqueue.put((REPLY_PKT, ident, queue))
             self.write_request_data(ident, chr(0x0), code, data)
         try:
             return queue.get(1, timeout)
@@ -261,47 +270,40 @@ class JDWPConnection(Thread):
         """
         try:
             self.unplug()
-            self.join(timeout=self.JOIN_TIMEOUT)
+            self.join(timeout=JOIN_TIMEOUT)
             self.socket_conn.shutdown(socket.SHUT_RDWR)
             self.socket_conn.close()
         except Exception, e:
             pass
 
 class JDWPHelper():
-    EVENT_METHOD_ENTRY = 40
-    EVENT_METHOD_EXIT_WITH_RETURN_VALUE = 42
-    EVENTREQUEST_MODKIND_CLASSMATCH = 5
-    SUSPEND_NONE = 0
-
-    LEN_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE_HEADER = 43
-
-    def __init__(self, jdwp_connection):
-        self.jdwp_connection = jdwp_connection
+    def __init__(self, jdwp_conn):
+        self.jdwp_conn = jdwp_conn
 
     def VirtualMachine_Resume(self):
         cmd = 0x0f09
-        return self.jdwp_connection.request(cmd)
+        return self.jdwp_conn.request(cmd)
 
     def VirtualMachine_Suspend(self):
         cmd = 0x0f08
-        return self.jdwp_connection.request(cmd)
+        return self.jdwp_conn.request(cmd)
 
     def EventRequest_Set_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE(self, class_pattern):
         cmd = 0x0f01
-        entry_event_kind = self.EVENT_METHOD_ENTRY
-        exit_event_kind = self.EVENT_METHOD_EXIT_WITH_RETURN_VALUE
-        suspend_policy = self.SUSPEND_NONE
+        entry_event_kind = EVENT_METHOD_ENTRY
+        exit_event_kind = EVENT_METHOD_EXIT_WITH_RETURN_VALUE
+        suspend_policy = SUSPEND_NONE
         modifiers = 1
 
         class_pattern_utf8 = unicode(class_pattern).encode("utf-8")
         modifier_data = struct.pack(">BI%ds" % (len(class_pattern_utf8)),
-                                    self.EVENTREQUEST_MODKIND_CLASSMATCH,
+                                    EVENTREQUEST_MODKIND_CLASSMATCH,
                                     len(class_pattern_utf8), class_pattern_utf8)
 
         entry_header_data = struct.pack(">BBI", entry_event_kind, suspend_policy, modifiers)
         exit_header_data = struct.pack(">BBI", exit_event_kind, suspend_policy, modifiers)
-        entry_ret = self.jdwp_connection.request(cmd, entry_header_data + modifier_data)
-        exit_ret = self.jdwp_connection.request(cmd, exit_header_data + modifier_data)
+        entry_ret = self.jdwp_conn.request(cmd, entry_header_data + modifier_data)
+        exit_ret = self.jdwp_conn.request(cmd, exit_header_data + modifier_data)
         # return requestID's
         return ((entry_event_kind, struct.unpack(">I", entry_ret[2])[0]),
                 (exit_event_kind, struct.unpack(">I", exit_ret[2])[0]))
@@ -309,17 +311,17 @@ class JDWPHelper():
     def EventRequest_Clear(self, event_kind, request_id):
         cmd = 0x0f02
         header_data = struct.pack(">BI", int(event_kind), int(request_id))
-        return self.jdwp_connection.request(cmd, header_data)
+        return self.jdwp_conn.request(cmd, header_data)
 
     def ReferenceType_Methods(self, ref_id):
         cmd = 0x0205
         header_data = struct.pack(">Q", ref_id)
-        return self.jdwp_connection.request(cmd, header_data)
+        return self.jdwp_conn.request(cmd, header_data)
 
     def ReferenceType_Signature(self, ref_id):
         cmd = 0x0201
         header_data = struct.pack(">Q", ref_id)
-        return self.jdwp_connection.request(cmd, header_data)
+        return self.jdwp_conn.request(cmd, header_data)
 
     def parse_return_value(self, return_value):
         basic_parser = {
@@ -377,7 +379,7 @@ class JDWPHelper():
             declared_offset = 4
             for i in range(declared):
                 method_id = struct.unpack(">Q", data[declared_offset:declared_offset + 8])[0]
-                declared_offset += self.jdwp_connection.methodIDSize
+                declared_offset += self.jdwp_conn.methodIDSize
                 name_len = struct.unpack(">I", data[declared_offset:declared_offset + 4])[0]
                 declared_offset += 4
                 name = struct.unpack(">%ds" % name_len, data[declared_offset:declared_offset + name_len])[0]
@@ -400,7 +402,7 @@ class JDWPHelper():
         class_id_set = set()
         for cmd_packet in cmd_packets:
             ident, code, data = cmd_packet
-            parsed_header = struct.unpack(">BIBIQBQQQ", data[:self.LEN_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE_HEADER])
+            parsed_header = struct.unpack(">BIBIQBQQQ", data[:LEN_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE_HEADER])
 
             parsed_packet = {
                 #"id": hex(ident),
@@ -416,8 +418,8 @@ class JDWPHelper():
                 "methodLocation": hex(parsed_header[8]),
             }
 
-            if parsed_packet["eventKind"] == hex(self.EVENT_METHOD_EXIT_WITH_RETURN_VALUE):
-                ret_data = self.parse_return_value(data[self.LEN_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE_HEADER:])
+            if parsed_packet["eventKind"] == hex(EVENT_METHOD_EXIT_WITH_RETURN_VALUE):
+                ret_data = self.parse_return_value(data[LEN_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE_HEADER:])
                 parsed_packet["returnType"] = ret_data[0]
                 parsed_packet["returnValue"] = ret_data[1]
 
