@@ -281,11 +281,11 @@ class JDWPHelper():
         self.jdwp_conn = jdwp_conn
 
     def VirtualMachine_Resume(self):
-        cmd = 0x0f09
+        cmd = 0x0109
         return self.jdwp_conn.request(cmd)
 
     def VirtualMachine_Suspend(self):
-        cmd = 0x0f08
+        cmd = 0x0108
         return self.jdwp_conn.request(cmd)
 
     def EventRequest_Set_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE(self, class_pattern):
