@@ -177,7 +177,7 @@ class JDWPConnection(Thread):
     def set_bind(self, pkt_type, ident, chan):
         """
         Bind the queue for REPLY_PKT
-        not for CMD_PKT, they're buffered
+        not for CMD_PKT, they're buffered or handled by handlers
         """
         if pkt_type == REPLY_PKT:
             self.reply_pkt_map[ident] = chan
@@ -279,14 +279,32 @@ class JDWPConnection(Thread):
 class JDWPHelper():
     def __init__(self, jdwp_conn):
         self.jdwp_conn = jdwp_conn
+        self.class_id2name = {}
+        self.method_id2name = {}
+
+    def VirtualMachine_ClassesBySignature(self, signature):
+        cmd = 0x0102
+        signature_utf8 = unicode(signature).encode("utf-8")
+        header_data = struct.pack(">I%ds" % len(signature_utf8), len(signature_utf8), signature_utf8)
+        return self.jdwp_conn.request(cmd, header_data)
+
+    def VirtualMachine_Suspend(self):
+        cmd = 0x0108
+        return self.jdwp_conn.request(cmd)
 
     def VirtualMachine_Resume(self):
         cmd = 0x0109
         return self.jdwp_conn.request(cmd)
 
-    def VirtualMachine_Suspend(self):
-        cmd = 0x0108
-        return self.jdwp_conn.request(cmd)
+    def ReferenceType_Signature(self, ref_id):
+        cmd = 0x0201
+        header_data = struct.pack(">Q", ref_id)
+        return self.jdwp_conn.request(cmd, header_data)
+
+    def ReferenceType_Methods(self, ref_id):
+        cmd = 0x0205
+        header_data = struct.pack(">Q", ref_id)
+        return self.jdwp_conn.request(cmd, header_data)
 
     def EventRequest_Set_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE(self, class_pattern):
         cmd = 0x0f01
@@ -296,7 +314,7 @@ class JDWPHelper():
         modifiers = 1
 
         class_pattern_utf8 = unicode(class_pattern).encode("utf-8")
-        modifier_data = struct.pack(">BI%ds" % (len(class_pattern_utf8)),
+        modifier_data = struct.pack(">BI%ds" % len(class_pattern_utf8),
                                     EVENTREQUEST_MODKIND_CLASSMATCH,
                                     len(class_pattern_utf8), class_pattern_utf8)
 
@@ -311,16 +329,6 @@ class JDWPHelper():
     def EventRequest_Clear(self, event_kind, request_id):
         cmd = 0x0f02
         header_data = struct.pack(">BI", int(event_kind), int(request_id))
-        return self.jdwp_conn.request(cmd, header_data)
-
-    def ReferenceType_Methods(self, ref_id):
-        cmd = 0x0205
-        header_data = struct.pack(">Q", ref_id)
-        return self.jdwp_conn.request(cmd, header_data)
-
-    def ReferenceType_Signature(self, ref_id):
-        cmd = 0x0201
-        header_data = struct.pack(">Q", ref_id)
         return self.jdwp_conn.request(cmd, header_data)
 
     def parse_return_value(self, return_value):
@@ -349,36 +357,45 @@ class JDWPHelper():
         else:
             return basic_parser[return_value[0]](return_value[1:])
 
-    def build_class_method_mapping(self, class_id_list):
+    def update_class_method_info_by_class_names(self, class_name_list):
         """
-        mapping = {
+        self.class_id2sig = {
+            "classId": "className"
+        }
+        self.method_id2name = {
             "classId": {
-                "className": "class1"
-                "methods": {
-                    "methodId": {
-                        "name": "methodName",
-                        "signature: "methodSig"
-                    }
+                "methodId": {
+                    "name": "methodName"
+                    "signature": "methodSignature"
                 }
             }
         }
         """
-        ret_dict = {}
-        for class_id in sorted(class_id_list):
-            # get class name
-            ident, code, data = self.ReferenceType_Signature(class_id)
-            class_sig_len = struct.unpack(">I", data[:4])[0]
-            class_sig = struct.unpack(">%ds" % class_sig_len, data[4:])[0]
-            ret_dict[hex(class_id)] = {
-                "className": class_sig[len("L"):-len(";")].replace("/", "."),
-                "methods": {}
-            }
-            # get method name
+        new_class_id2name = {}
+        # get class id by class name
+        for class_name in class_name_list:
+            class_sig = "L%s;" % class_name.replace(".", "/")
+            ident, code, data = self.VirtualMachine_ClassesBySignature(class_sig)
+
+            classes = struct.unpack(">I", data[:4])[0]
+
+            for i in range(classes):
+                ref_type_tag = struct.unpack(">B", data[4:5])[0]
+                type_id = struct.unpack(">Q", data[5:5 + self.jdwp_conn.referenceTypeIDSize])[0]
+                if not type_id in self.class_id2name:
+                    new_class_id2name[type_id] = class_name
+                    self.class_id2name[type_id] = class_name
+
+        # for each class get its method id and method name
+        for class_id, class_name in new_class_id2name.iteritems():
+            self.method_id2name[class_id] = {}
+
             ident, code, data = self.ReferenceType_Methods(class_id)
             declared = struct.unpack(">I", data[:4])[0]
             declared_offset = 4
+
             for i in range(declared):
-                method_id = struct.unpack(">Q", data[declared_offset:declared_offset + 8])[0]
+                method_id = struct.unpack(">Q", data[declared_offset:declared_offset + self.jdwp_conn.methodIDSize])[0]
                 declared_offset += self.jdwp_conn.methodIDSize
                 name_len = struct.unpack(">I", data[declared_offset:declared_offset + 4])[0]
                 declared_offset += 4
@@ -390,12 +407,12 @@ class JDWPHelper():
                 # add mod bits as well
                 declared_offset += signature_len + 4
 
-                ret_dict[hex(class_id)]["methods"][hex(method_id)] = {
+                self.method_id2name[class_id][method_id] = {
                     "name": name,
                     "signature": signature
                 }
 
-        return ret_dict
+        print json.dumps(self.class_id2name, indent=2)
 
     def parse_cmd_packets(self, cmd_packets):
         ret_list = []
@@ -405,20 +422,20 @@ class JDWPHelper():
             parsed_header = struct.unpack(">BIBIQBQQQ", data[:LEN_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE_HEADER])
 
             parsed_packet = {
-                #"id": hex(ident),
-                #"command": hex(code),
-                #"suspendPolicy": hex(parsed_header[0]),
-                #"events": hex(parsed_header[1]),
-                "eventKind": hex(parsed_header[2]),
-                #"requestID": hex(parsed_header[3]),
-                "thread": hex(parsed_header[4]),
-                #"typeTag": hex(parsed_header[5]),
-                "classID": hex(parsed_header[6]),
-                "methodID": hex(parsed_header[7]),
-                "methodLocation": hex(parsed_header[8]),
+                #"id": ident,
+                #"command": code,
+                #"suspendPolicy": parsed_header[0],
+                #"events": parsed_header[1],
+                "eventKind": parsed_header[2],
+                #"requestID": parsed_header[3],
+                "thread": parsed_header[4],
+                #"typeTag": parsed_header[5],
+                "classID": parsed_header[6],
+                "methodID": parsed_header[7],
+                "methodLocation": parsed_header[8],
             }
 
-            if parsed_packet["eventKind"] == hex(EVENT_METHOD_EXIT_WITH_RETURN_VALUE):
+            if parsed_packet["eventKind"] == EVENT_METHOD_EXIT_WITH_RETURN_VALUE:
                 ret_data = self.parse_return_value(data[LEN_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE_HEADER:])
                 parsed_packet["returnType"] = ret_data[0]
                 parsed_packet["returnValue"] = ret_data[1]
@@ -426,12 +443,11 @@ class JDWPHelper():
             ret_list.append(parsed_packet)
             class_id_set.add(parsed_header[6])
 
-        class_method_mapping = self.build_class_method_mapping(list(class_id_set))
         for parsed_packet in ret_list:
             class_id = parsed_packet.pop("classID")
             method_id = parsed_packet.pop("methodID")
-            class_name = class_method_mapping[class_id]["className"]
-            method_info = class_method_mapping[class_id]["methods"][method_id]
+            class_name = self.class_id2name[class_id]
+            method_info = self.method_id2name[class_id][method_id]
             parsed_packet["classMethodName"] = ".".join([class_name, method_info["name"]])
             parsed_packet["signature"] = method_info["signature"]
 

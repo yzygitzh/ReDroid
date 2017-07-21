@@ -72,12 +72,10 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
         port = 7335 if is_emulator else 7336
         adb.forward(app_pid, port)
 
-        # jdwp init
+        # jdwp init & attach
         jdwp = JDWPConnection("localhost", port)
-        jdwp_helper = JDWPHelper(jdwp)
-
-        # jdwp attach
         jdwp.start()
+        jdwp_helper = JDWPHelper(jdwp)
 
         trace_result = []
 
@@ -87,6 +85,7 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
             jdwp_helper.VirtualMachine_Suspend()
             # prepare classes to listen, and listen to them
             class_list = extract_method_classes(monitoring_methods)
+            jdwp_helper.update_class_method_info_by_class_names(class_list)
             event_ids = []
             for class_pattern in class_list:
                 ent, ext = jdwp_helper.EventRequest_Set_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE(class_pattern)
