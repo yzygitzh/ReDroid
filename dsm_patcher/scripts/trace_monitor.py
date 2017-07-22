@@ -88,9 +88,12 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
             jdwp_helper.update_class_method_info_by_class_names(class_list)
             event_ids = []
             for class_pattern in class_list:
-                ent, ext = jdwp_helper.EventRequest_Set_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE(class_pattern)
+                ent = jdwp_helper.EventRequest_Set_METHOD_ENTRY(class_pattern)
+                ext = jdwp_helper.EventRequest_Set_METHOD_EXIT_WITH_RETURN_VALUE(class_pattern)
+                pre = jdwp_helper.EventRequest_Set_CLASS_PREPARE(class_pattern)
                 event_ids.append(ent)
                 event_ids.append(ext)
+                event_ids.append(pre)
 
             # start sampling
             jdwp.plug()

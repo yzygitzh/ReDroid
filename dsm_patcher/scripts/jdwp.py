@@ -37,12 +37,17 @@ REPLY_PACKET_TYPE = 0x80
 HANDSHAKE_MSG = 'JDWP-Handshake'
 JOIN_TIMEOUT = 0.2
 
+EVENT_BREAKPOINT = 2
+EVENT_CLASS_PREPARE = 8
 EVENT_METHOD_ENTRY = 40
 EVENT_METHOD_EXIT_WITH_RETURN_VALUE = 42
 EVENTREQUEST_MODKIND_CLASSMATCH = 5
+
 SUSPEND_NONE = 0
+SUSPEND_ALL = 2
 
 LEN_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE_HEADER = 43
+LEN_CLASS_PREPARE_HEADER = 27
 
 class JDWPConnection(Thread):
 
@@ -60,6 +65,15 @@ class JDWPConnection(Thread):
 
         self.unplug_flag = Event()
         self.lock = Lock()
+
+        self.breakpoint_handler = None
+        self.class_prepare_handler = None
+
+    def set_breakpoint_handler(self, handler):
+        self.breakpoint_handler = handler
+
+    def set_class_prepare_handler(self, handler):
+        self.class_prepare_handler = handler
 
     def do_read(self, amt):
         """
@@ -193,7 +207,14 @@ class JDWPConnection(Thread):
                 return
             return chan.put((ident, code, data))
         elif not self.unplug_flag.is_set(): # command packets are buffered
-            self.cmd_pkt_queue.put((ident, code, data))
+            if code == 0x4064:
+                event_kind = struct.unpack(">BIB", data[:6])[2]
+                if event_kind in [EVENT_METHOD_ENTRY, EVENT_METHOD_EXIT_WITH_RETURN_VALUE]:
+                    self.cmd_pkt_queue.put((ident, code, data))
+                elif event_kind == EVENT_BREAKPOINT:
+                    Thread(target=self.breakpoint_handler, args=[data]).start()
+                elif event_kind == EVENT_CLASS_PREPARE:
+                    Thread(target=self.class_prepare_handler, args=[data]).start()
 
     def get_cmd_packets(self):
         ret_list = []
@@ -279,6 +300,8 @@ class JDWPConnection(Thread):
 class JDWPHelper():
     def __init__(self, jdwp_conn):
         self.jdwp_conn = jdwp_conn
+        self.jdwp_conn.set_breakpoint_handler(self.breakpoint_handler)
+        self.jdwp_conn.set_class_prepare_handler(self.class_prepare_handler)
         self.class_id2name = {}
         self.method_id2name = {}
 
@@ -306,11 +329,17 @@ class JDWPHelper():
         header_data = struct.pack(">Q", ref_id)
         return self.jdwp_conn.request(cmd, header_data)
 
-    def EventRequest_Set_METHOD_ENTRY_AND_EXIT_WITH_RETURN_VALUE(self, class_pattern):
+    def EventRequest_Set_METHOD_ENTRY(self, class_pattern):
+        return self.EventRequest_Set_workload_classmatch(class_pattern, EVENT_METHOD_ENTRY, SUSPEND_NONE)
+
+    def EventRequest_Set_METHOD_EXIT_WITH_RETURN_VALUE(self, class_pattern):
+        return self.EventRequest_Set_workload_classmatch(class_pattern, EVENT_METHOD_EXIT_WITH_RETURN_VALUE, SUSPEND_NONE)
+
+    def EventRequest_Set_CLASS_PREPARE(self, class_pattern):
+        return self.EventRequest_Set_workload_classmatch(class_pattern, EVENT_CLASS_PREPARE, SUSPEND_ALL)
+
+    def EventRequest_Set_workload_classmatch(self, class_pattern, event_kind, suspend_policy):
         cmd = 0x0f01
-        entry_event_kind = EVENT_METHOD_ENTRY
-        exit_event_kind = EVENT_METHOD_EXIT_WITH_RETURN_VALUE
-        suspend_policy = SUSPEND_NONE
         modifiers = 1
 
         class_pattern_utf8 = unicode(class_pattern).encode("utf-8")
@@ -318,13 +347,10 @@ class JDWPHelper():
                                     EVENTREQUEST_MODKIND_CLASSMATCH,
                                     len(class_pattern_utf8), class_pattern_utf8)
 
-        entry_header_data = struct.pack(">BBI", entry_event_kind, suspend_policy, modifiers)
-        exit_header_data = struct.pack(">BBI", exit_event_kind, suspend_policy, modifiers)
-        entry_ret = self.jdwp_conn.request(cmd, entry_header_data + modifier_data)
-        exit_ret = self.jdwp_conn.request(cmd, exit_header_data + modifier_data)
+        header_data = struct.pack(">BBI", event_kind, suspend_policy, modifiers)
+        ret = self.jdwp_conn.request(cmd, header_data + modifier_data)
         # return requestID's
-        return ((entry_event_kind, struct.unpack(">I", entry_ret[2])[0]),
-                (exit_event_kind, struct.unpack(">I", exit_ret[2])[0]))
+        return event_kind, struct.unpack(">I", ret[2])[0],
 
     def EventRequest_Clear(self, event_kind, request_id):
         cmd = 0x0f02
@@ -412,8 +438,6 @@ class JDWPHelper():
                     "signature": signature
                 }
 
-        print json.dumps(self.class_id2name, indent=2)
-
     def parse_cmd_packets(self, cmd_packets):
         ret_list = []
         class_id_set = set()
@@ -452,3 +476,17 @@ class JDWPHelper():
             parsed_packet["signature"] = method_info["signature"]
 
         return ret_list
+
+    def breakpoint_handler(self, data):
+        pass
+
+    def class_prepare_handler(self, data):
+        data_idx = 0
+        suspend_policy, events, event_kind, request_id, thread, ref_type_tag, type_id = struct.unpack(">BIBIQBQ", data[data_idx:LEN_CLASS_PREPARE_HEADER])
+        data_idx = LEN_CLASS_PREPARE_HEADER
+        signature_len = struct.unpack(">I", data[data_idx:data_idx + 4])[0]
+        data_idx += 4
+        signature = struct.unpack(">%ds" % signature_len, data[data_idx:data_idx + signature_len])[0]
+        class_name = signature[len("L"):-len(";")].replace("/", ".")
+        self.update_class_method_info_by_class_names([class_name])
+        self.VirtualMachine_Resume()
