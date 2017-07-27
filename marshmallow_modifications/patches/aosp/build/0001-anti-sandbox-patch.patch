@@ -1,6 +1,6 @@
-From 403c30e10e8f8f0e85896bf78417a495b5b30313 Mon Sep 17 00:00:00 2001
+From f592d36ee4998e64eed28637ce6151dd90925347 Mon Sep 17 00:00:00 2001
 From: Ziyue Yang <yzylivezh@hotmail.com>
-Date: Tue, 20 Jun 2017 13:16:41 +0800
+Date: Thu, 27 Jul 2017 12:33:07 +0800
 Subject: [PATCH] anti sandbox patch
 
 ---
@@ -21,5 +21,5 @@ index a6f829ab6..31e0a86aa 100644
  
    # Turn on Dalvik preoptimization for user builds, but only if not
 -- 
-2.11.0
+2.13.2
 

@@ -1,6 +1,6 @@
-From 98354c5fc60776d02f2a1f498d6ce2269ec74c22 Mon Sep 17 00:00:00 2001
+From 83b47c999c96841aa8f0cf0b136ebbf752e670e4 Mon Sep 17 00:00:00 2001
 From: Ziyue Yang <yzylivezh@hotmail.com>
-Date: Tue, 20 Jun 2017 13:16:42 +0800
+Date: Thu, 27 Jul 2017 12:33:10 +0800
 Subject: [PATCH] anti sandbox patch
 
 ---
@@ -22,5 +22,5 @@ index d4adbfb6a..7e1c24103 100644
  ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
  LOCAL_CFLAGS += -DALLOW_ADBD_DISABLE_VERITY=1
 -- 
-2.11.0
+2.13.2
 

@@ -1,14 +1,15 @@
-From 88d7511bd8370acfac76129951a5da54df35b3ce Mon Sep 17 00:00:00 2001
+From 95f3f02d648766f71aa67e466541e3e84c4e8ae5 Mon Sep 17 00:00:00 2001
 From: Ziyue Yang <yzylivezh@hotmail.com>
-Date: Tue, 20 Jun 2017 13:16:42 +0800
+Date: Thu, 27 Jul 2017 12:33:09 +0800
 Subject: [PATCH] anti sandbox patch
 
 ---
- core/java/android/app/ActivityThread.java                          | 4 ++--
- core/java/android/app/Instrumentation.java                         | 2 +-
- services/core/java/com/android/server/wm/WindowManagerService.java | 2 +-
- test-runner/src/android/test/TestRunner.java                       | 2 +-
- 4 files changed, 5 insertions(+), 5 deletions(-)
+ core/java/android/app/ActivityThread.java                     |  4 ++--
+ core/java/android/app/Instrumentation.java                    |  2 +-
+ core/java/android/os/Debug.java                               | 11 ++++++++---
+ .../core/java/com/android/server/wm/WindowManagerService.java |  2 +-
+ test-runner/src/android/test/TestRunner.java                  |  2 +-
+ 5 files changed, 13 insertions(+), 8 deletions(-)
 
 diff --git a/core/java/android/app/ActivityThread.java b/core/java/android/app/ActivityThread.java
 index da21eaffa95..7e506b64dd1 100644
@@ -45,6 +46,50 @@ index 69b8b9510b3..548b9a5b611 100644
          }
      }
  
+diff --git a/core/java/android/os/Debug.java b/core/java/android/os/Debug.java
+index fdd34f586e8..db349927a1c 100644
+--- a/core/java/android/os/Debug.java
++++ b/core/java/android/os/Debug.java
+@@ -711,13 +711,15 @@ public final class Debug
+      * Wait until a debugger attaches.  As soon as the debugger attaches,
+      * this returns, so you will need to place a breakpoint after the
+      * waitForDebugger() call if you want to start tracing immediately.
++     * Changed to use VMDebug.isDebuggerConnected for ReDroid
+      */
+     public static void waitForDebugger() {
+         if (!VMDebug.isDebuggingEnabled()) {
+             //System.out.println("debugging not enabled, not waiting");
+             return;
+         }
+-        if (isDebuggerConnected())
++        // if (isDebuggerConnected())
++        if (VMDebug.isDebuggerConnected())
+             return;
+ 
+         // if DDMS is listening, inform them of our plight
+@@ -727,7 +729,8 @@ public final class Debug
+         DdmServer.sendChunk(waitChunk);
+ 
+         mWaiting = true;
+-        while (!isDebuggerConnected()) {
++        // while (!isDebuggerConnected()) {
++        while (!VMDebug.isDebuggerConnected()) {
+             try { Thread.sleep(SPIN_DELAY); }
+             catch (InterruptedException ie) {}
+         }
+@@ -772,9 +775,11 @@ public final class Debug
+ 
+     /**
+      * Determine if a debugger is currently attached.
++     * Changed to always return false for ReDroid
+      */
+     public static boolean isDebuggerConnected() {
+-        return VMDebug.isDebuggerConnected();
++        // return VMDebug.isDebuggerConnected();
++        return false;
+     }
+ 
+     /**
 diff --git a/services/core/java/com/android/server/wm/WindowManagerService.java b/services/core/java/com/android/server/wm/WindowManagerService.java
 index d695d936b0d..f60998525d3 100644
 --- a/services/core/java/com/android/server/wm/WindowManagerService.java
@@ -72,5 +117,5 @@ index 012df350102..a8494f922af 100644
  
      public void finishProfiling() {
 -- 
-2.11.0
+2.13.2
 

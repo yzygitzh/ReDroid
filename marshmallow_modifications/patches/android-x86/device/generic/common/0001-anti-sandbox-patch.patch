@@ -1,6 +1,6 @@
-From aaed5cff73202b87b1ad1d4c60361e35338a7366 Mon Sep 17 00:00:00 2001
+From 9d25d9f2b1b1df56742523a335b359dd43184270 Mon Sep 17 00:00:00 2001
 From: Ziyue Yang <yzylivezh@hotmail.com>
-Date: Tue, 20 Jun 2017 13:16:42 +0800
+Date: Thu, 27 Jul 2017 12:33:11 +0800
 Subject: [PATCH] anti sandbox patch
 
 ---
@@ -25,5 +25,5 @@ index 18a06db..1e6defa 100644
  	if mountpoint -q $dest_dir; then
  		kill -9 `fuser -m $dest_dir`
 -- 
-2.11.0
+2.13.2
 

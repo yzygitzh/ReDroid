@@ -1,6 +1,6 @@
-From ce078f4dd6387fa90b3471a324ec801e4535252a Mon Sep 17 00:00:00 2001
+From b06bb6f9f0c5deb9fd24d98c6d9b96f7c0a2ffdf Mon Sep 17 00:00:00 2001
 From: Ziyue Yang <yzylivezh@hotmail.com>
-Date: Tue, 20 Jun 2017 13:16:42 +0800
+Date: Thu, 27 Jul 2017 12:33:11 +0800
 Subject: [PATCH] anti sandbox patch
 
 ---
@@ -19,5 +19,5 @@ index 4d6261572..f59b73ba2 100644
 +# fix analytics package
 +org\.android_x86\.analytics
 -- 
-2.11.0
+2.13.2
 

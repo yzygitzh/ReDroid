@@ -1,6 +1,6 @@
-From da07e36e987ad5ae940e88276e7d8c0f35145d44 Mon Sep 17 00:00:00 2001
+From 2f124aacb68a5b6610806cb2ada657d5f4d01684 Mon Sep 17 00:00:00 2001
 From: Ziyue Yang <yzylivezh@hotmail.com>
-Date: Tue, 20 Jun 2017 13:16:42 +0800
+Date: Thu, 27 Jul 2017 12:33:11 +0800
 Subject: [PATCH] anti sandbox patch
 
 ---
@@ -28,5 +28,5 @@ index 48ca8fd..de457c5 100644
  label debug
  	menu label Live CD - ^Debug mode
 -- 
-2.11.0
+2.13.2
 
