@@ -1,6 +1,0 @@
-[submodule "app_samples/anti-emulator"]
-	path = app_samples/anti-emulator
-	url = git@github.com:yzygitzh/anti-emulator.git
-[submodule "app_samples/dendroid_apk"]
-	path = app_samples/dendroid_apk
-	url = git@github.com:yzygitzh/dendroid_apk.git
