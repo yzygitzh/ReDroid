@@ -7,7 +7,7 @@ import time
 import argparse
 
 from adb import ADBException, ADBConnection
-from utils import java_method_convert, get_monitoring_methods, extract_method_classes
+from utils import get_monitoring_methods, extract_method_classes
 from jdwp import JDWPConnection, JDWPHelper
 
 def monitor_func(device_id, apk_path_list, droidbot_out_dir,

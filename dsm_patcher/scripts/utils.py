@@ -1,4 +1,4 @@
-def java_method_convert(short_sig):
+def java_shorty2full(short_sig):
     basic_type_mapping = {
         "Z": "boolean",
         "B": "byte",
@@ -7,13 +7,15 @@ def java_method_convert(short_sig):
         "I": "int",
         "J": "long",
         "F": "float",
-        "D": "double"
+        "D": "double",
+        "V": "void"
     }
     fields = short_sig.split()
     idx = 1
     array_depth = 0
     parsed_paras = []
-    while fields[1][idx] != ")":
+    # while fields[1][idx] != ")":
+    while idx < len(fields[1]):
         if fields[1][idx] == "L":
             class_end_idx = idx
             while fields[1][class_end_idx] != ";":
@@ -22,12 +24,15 @@ def java_method_convert(short_sig):
             idx = class_end_idx
         elif fields[1][idx] == "[":
             array_depth += 1
-        else:
+        elif fields[1][idx] != ")":
             parsed_paras.append(basic_type_mapping[fields[1][idx]] + array_depth * "[]")
             array_depth = 0
         idx += 1
-    return "%s(%s)" % (fields[0], ",".join(parsed_paras))
+    return fields[0], parsed_paras
 
+def java_full4jdwp(shorty_sig):
+    class_method, parsed_paras = java_shorty2full(shorty_sig)
+    return "%s(%s)" % (class_method, ",".join(parsed_paras[:-1]))
 
 def get_monitoring_methods(trace_item_list):
     ret_list = []
@@ -37,7 +42,7 @@ def get_monitoring_methods(trace_item_list):
         fields = trace_item.split()
         sig_end = fields[1][-len(")X"):]
         if sig_end in method_filter:
-            ret_list.append(java_method_convert(trace_item))
+            ret_list.append(java_full4jdwp(trace_item))
     return set(ret_list)
 
 def extract_method_classes(methods_list):
