@@ -99,4 +99,4 @@ Build them and use them. For `anti-emulator` sample, NDK is necessary.
 [dendroid]: https://github.com/yzygitzh/dendroid_apk
 [libradar]: https://github.com/pkumza/LibRadar
 [andx86_vb]: http://www.android-x86.org/documents/virtualboxhowto
-[prebuilt-imgs]: https://www.dropbox.com/s/wj5nnio77zmgcvq/ReDroid_img.tar.gz?dl=0
+[prebuilt-imgs]: https://www.dropbox.com/s/meup13r5su1dmyu/ReDroid_img.tar.gz?dl=0
