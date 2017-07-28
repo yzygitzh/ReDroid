@@ -4,7 +4,10 @@
             "returnValue": false,
             "paraList": [],
             "returnType": "boolean",
-            "classMethodName": "diff.strazzere.anti.MainActivity.isDebugged"
+            "classMethodName": "diff.strazzere.anti.MainActivity.isDebugged",
+            "stackTrace": [
+                "diff.strazzere.anti.MainActivity.isDebugged"
+            ]
         },
         {
             "returnValue": 35,
@@ -14,7 +17,8 @@
                 "java.lang.String"
             ],
             "returnType": "int",
-            "classMethodName": "android.util.Log.println"
+            "classMethodName": "android.util.Log.println",
+            "stackTrace": []
         }
     ]
 }
