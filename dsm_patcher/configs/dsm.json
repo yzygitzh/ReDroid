@@ -1,0 +1,20 @@
+{
+    "diff.strazzere.anti": [
+        {
+            "returnValue": false,
+            "paraList": [],
+            "returnType": "boolean",
+            "classMethodName": "diff.strazzere.anti.MainActivity.isDebugged"
+        },
+        {
+            "returnValue": 35,
+            "paraList": [
+                "int",
+                "java.lang.String",
+                "java.lang.String"
+            ],
+            "returnType": "int",
+            "classMethodName": "android.util.Log.println"
+        }
+    ]
+}
