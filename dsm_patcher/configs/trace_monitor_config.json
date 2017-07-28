@@ -8,8 +8,5 @@
     "output_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_dsm/monitor",
     "tracing_interval": 10,
     "interval": 3,
-    "timeout": 600,
-    "method_white_list": {
-        "a": true
-    }
+    "timeout": 600
 }
