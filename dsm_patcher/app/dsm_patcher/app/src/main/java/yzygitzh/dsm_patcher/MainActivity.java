@@ -16,7 +16,7 @@ public class MainActivity extends AppCompatActivity {
 
         refreshButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                if (DSMRules.initDSMRules()) {
+                if (DSMRules.initDSMRules() && DSMPatcher.hookDSMRulePackages()) {
                     Snackbar.make(v, R.string.dsm_success_msg, Snackbar.LENGTH_SHORT).show();
                 } else {
                     Snackbar.make(v, R.string.dsm_fail_msg, Snackbar.LENGTH_SHORT).show();

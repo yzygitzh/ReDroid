@@ -33,7 +33,7 @@ public class DSMRules {
             dsmRules = new JSONObject(jsonStr);
             return true;
         } catch (Exception e) {
-            XposedBridge.log(e.toString());
+            XposedBridge.log(e);
         }
         return false;
     }
