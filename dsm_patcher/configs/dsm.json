@@ -1,7 +1,7 @@
 {
     "diff.strazzere.anti": [
         {
-            "returnValue": false,
+            "returnValue": true,
             "paraList": [],
             "returnType": "boolean",
             "classMethodName": "diff.strazzere.anti.MainActivity.isDebugged",
@@ -28,7 +28,7 @@
             "stackTrace": []
         },
         {
-            "returnValue": null,
+            "returnValue": false,
             "paraList": [],
             "returnType": "boolean",
             "classMethodName": "android.os.Debug.isDebuggerConnected",

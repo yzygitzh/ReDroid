@@ -45,8 +45,6 @@ public class DSMPatcher implements IXposedHookLoadPackage {
                 String className = classMethodName.substring(0, lastDotPos);
                 String methodName = classMethodName.substring(lastDotPos + 1);
 
-                String returnType = dsmRule.getString("returnType");
-
                 final JSONArray stackTrace = dsmRule.getJSONArray("stackTrace");
 
                 JSONArray methodParaList = dsmRule.getJSONArray("paraList");
@@ -62,7 +60,6 @@ public class DSMPatcher implements IXposedHookLoadPackage {
                             hookMethodParaList.add(paraType);
                     }
                 }
-                XposedBridge.log(lpparam.packageName + ": " + classMethodName + " before hook");
 
                 hookMethodParaList.add(new XC_MethodHook() {
                     @Override
@@ -71,18 +68,24 @@ public class DSMPatcher implements IXposedHookLoadPackage {
                     }
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                        // this will be called after the clock was updated by the original method
-                        /*
-                        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-                        for (StackTraceElement ele: stackTrace) {
-                            String classMethod = ele.getClassName() + "." + ele.getMethodName();
-                            XposedBridge.log(classMethod);
-                            if (classMethod.equals("diff.strazzere.anti.MainActivity.isDebugged")) {
-                                XposedBridge.log("233");
-                                param.setResult(false);
+                        StackTraceElement[] currentStackTrace = Thread.currentThread().getStackTrace();
+                        if (isSubSequence(stackTrace, currentStackTrace)) {
+                            String returnType = dsmRule.getString("returnType");
+                            switch (returnType) {
+                                case "boolean":
+                                    boolean ZRetVal = dsmRule.getBoolean("returnValue");
+                                    param.setResult(ZRetVal);
+                                    XposedBridge.log(classMethodName + " now returns " + Boolean.toString(ZRetVal));
+                                    break;
+                                case "int":
+                                    int IRetVal = dsmRule.getInt("returnValue");
+                                    param.setResult(IRetVal);
+                                    XposedBridge.log(classMethodName + " now returns " + Integer.toString(IRetVal));
+                                    break;
+                                default:
                             }
                         }
-                        */
+
                         XposedBridge.log(lpparam.packageName + ": " + classMethodName + " ext");
                     }
                 });
@@ -117,5 +120,23 @@ public class DSMPatcher implements IXposedHookLoadPackage {
             XposedBridge.log("initDSMRules failed");
             return false;
         }
+    }
+
+    // whether a is a sub-sequence of b
+    private boolean isSubSequence(JSONArray a, StackTraceElement[] b) {
+        int aLen = a.length(), aIdx = 0;
+        int bLen = b.length, bIdx = 0;
+        while (aIdx < aLen && bIdx < bLen) {
+            try {
+                String aStr = a.getString(aIdx);
+                String bStr = b[bIdx].getClassName() + "." + b[bIdx].getMethodName();
+                if (aStr.equals(bStr)) aIdx += 1;
+                bIdx += 1;
+            } catch (JSONException e) {
+                return false;
+            }
+        }
+        if (aIdx == aLen) return true;
+        else return false;
     }
 }
