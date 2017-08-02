@@ -361,7 +361,7 @@ class JDWPHelper():
         basic_parser = {
             "Z": lambda x: ("boolean", struct.unpack(">?", x)[0]),
             "B": lambda x: ("byte", chr(struct.unpack(">B", x)[0])),
-            "C": lambda x: ("unicode", unicode(x)),
+            "C": lambda x: ("char", unicode(x)),
             "S": lambda x: ("short", struct.unpack(">h", x)[0]),
             "I": lambda x: ("int", struct.unpack(">i", x)[0]),
             "J": lambda x: ("long", struct.unpack(">q", x)[0]),

@@ -51,14 +51,7 @@ public class DSMPatcher implements IXposedHookLoadPackage {
                 List<Object> hookMethodParaList = new ArrayList<>();
                 int paraListLen = methodParaList.length();
                 for (int j = 0; j < paraListLen; j++) {
-                    String paraType = methodParaList.getString(j);
-                    switch (paraType) {
-                        case "int":
-                            hookMethodParaList.add(int.class);
-                            break;
-                        default:
-                            hookMethodParaList.add(paraType);
-                    }
+                    hookMethodParaList.add(methodParaList.getString(j));
                 }
 
                 hookMethodParaList.add(new XC_MethodHook() {
@@ -77,12 +70,48 @@ public class DSMPatcher implements IXposedHookLoadPackage {
                                     param.setResult(ZRetVal);
                                     XposedBridge.log(classMethodName + " now returns " + Boolean.toString(ZRetVal));
                                     break;
+                                case "byte":
+                                    byte BRetVal = (byte) dsmRule.getInt("returnValue");
+                                    param.setResult(BRetVal);
+                                    XposedBridge.log(classMethodName + " now returns " + Byte.toString(BRetVal));
+                                    break;
+                                case "char":
+                                    char CRetVal = dsmRule.getString("returnValue").charAt(0);
+                                    param.setResult(CRetVal);
+                                    XposedBridge.log(classMethodName + " now returns " + Character.toString(CRetVal));
+                                    break;
+                                case "short":
+                                    short SRetVal = (short) dsmRule.getInt("returnValue");
+                                    param.setResult(SRetVal);
+                                    XposedBridge.log(classMethodName + " now returns " + Short.toString(SRetVal));
+                                    break;
                                 case "int":
                                     int IRetVal = dsmRule.getInt("returnValue");
                                     param.setResult(IRetVal);
                                     XposedBridge.log(classMethodName + " now returns " + Integer.toString(IRetVal));
                                     break;
+                                case "long":
+                                    long JRetVal = dsmRule.getLong("returnValue");
+                                    param.setResult(JRetVal);
+                                    XposedBridge.log(classMethodName + " now returns " + Long.toString(JRetVal));
+                                    break;
+                                case "float":
+                                    float FRetVal = (float) dsmRule.getDouble("returnValue");
+                                    param.setResult(FRetVal);
+                                    XposedBridge.log(classMethodName + " now returns " + Float.toString(FRetVal));
+                                    break;
+                                case "double":
+                                    double DRetVal = dsmRule.getDouble("returnValue");
+                                    param.setResult(DRetVal);
+                                    XposedBridge.log(classMethodName + " now returns " + Double.toString(DRetVal));
+                                    break;
+                                case "string":
+                                    String sRetVal = dsmRule.getString("returnValue");
+                                    param.setResult(sRetVal);
+                                    XposedBridge.log(classMethodName + " now returns " + sRetVal);
+                                    break;
                                 default:
+                                    XposedBridge.log(classMethodName + " return type: " + returnType + ", not supported");
                             }
                         }
 
