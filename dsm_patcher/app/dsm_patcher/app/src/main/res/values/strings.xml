@@ -1,5 +1,3 @@
 <resources>
     <string name="app_name">ReDroid</string>
-    <string name="dsm_success_msg">DSM patche rules updated</string>
-    <string name="dsm_fail_msg">Failed to update DSM patche rules</string>
 </resources>

@@ -21,18 +21,6 @@
             "stackTrace": []
         },
         {
-            "returnValue": 35,
-            "paraList": [
-                "int",
-                "int",
-                "java.lang.String",
-                "java.lang.String"
-            ],
-            "returnType": "int",
-            "classMethodName": "android.util.Log.println_native",
-            "stackTrace": []
-        },
-        {
             "returnValue": null,
             "paraList": [],
             "returnType": "void",

@@ -1,9 +1,17 @@
 package yzygitzh.dsm_patcher;
 
+import android.os.FileObserver;
+import android.util.Log;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -19,57 +27,13 @@ import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.callbacks.XC_LoadPackage.LoadPackageParam;
 
 public class DSMPatcher implements IXposedHookLoadPackage {
-    // packageName -> lpparam
-    private static Map<String, LoadPackageParam> lpParamMap = new HashMap<>();
-    // packageName -> unhook object
-    private static Map<String, XC_MethodHook.Unhook> unhookMap = new HashMap<>();
-
-    /*
-     * There are 2 phase of method hooking
-     * 1. package loading
-     * 2. refresh button
-     */
-    public DSMPatcher() {
-        if (DSMRules.initDSMRules()) {
-            XposedBridge.log("DSMPatcher: init succeeded");
-        } else {
-            XposedBridge.log("DSMPatcher: init failed");
-        }
-    }
+    final private String dsmFilePath = "/data/system/ReDroid/dsm.json";
+    private JSONArray dsmRuleList = null;
 
     public void handleLoadPackage(final LoadPackageParam lpparam) throws Throwable {
-        lpParamMap.put(lpparam.packageName, lpparam);
-        JSONObject dsmRules = DSMRules.getDSMRules();
-        if (dsmRules.has(lpparam.packageName)) {
-            try {
-                hookPackage(lpparam.packageName, dsmRules.getJSONArray(lpparam.packageName));
-            } catch (JSONException e) {
-                XposedBridge.log(e);
-            }
-        }
-    }
-
-    public static boolean hookDSMRulePackages() {
-        JSONObject dsmRules = DSMRules.getDSMRules();
-        Iterator<String> keyItr = dsmRules.keys();
-        while (keyItr.hasNext()) {
-            String packageName = keyItr.next();
-            try {
-                hookPackage(packageName, dsmRules.getJSONArray(packageName));
-            } catch (JSONException e) {
-                XposedBridge.log(e);
-                return false;
-            }
-        }
-        return true;
-    }
-
-    public static void hookPackage(String packageName, JSONArray dsmRuleList) {
-        if (!lpParamMap.containsKey(packageName))
+        if (!initDSMRules(lpparam.packageName)) {
             return;
-        final LoadPackageParam lpparam = lpParamMap.get(packageName);
-
-        // TODO: Unhook before hook
+        }
 
         int ruleListLen = dsmRuleList.length();
         for (int i = 0; i < ruleListLen; i++) {
@@ -98,6 +62,8 @@ public class DSMPatcher implements IXposedHookLoadPackage {
                             hookMethodParaList.add(paraType);
                     }
                 }
+                XposedBridge.log(lpparam.packageName + ": " + classMethodName + " before hook");
+
                 hookMethodParaList.add(new XC_MethodHook() {
                     @Override
                     protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
@@ -122,11 +88,34 @@ public class DSMPatcher implements IXposedHookLoadPackage {
                 });
 
                 XC_MethodHook.Unhook unhookEntry = findAndHookMethod(className, lpparam.classLoader, methodName, hookMethodParaList.toArray());
-                XposedBridge.log(packageName + ": " + classMethodName + " hooked");
+                XposedBridge.log(lpparam.packageName + ": " + classMethodName + " hooked");
             } catch (JSONException e){
-                XposedBridge.log(e);
+                XposedBridge.log("hook method failed");
             }
         }
     }
 
+    private boolean initDSMRules(String packageName) {
+        File dsmFile = new File(dsmFilePath);
+        try {
+            FileInputStream fs = new FileInputStream(dsmFile);
+            FileChannel fc = fs.getChannel();
+            MappedByteBuffer bb = fc.map(FileChannel.MapMode.READ_ONLY, 0, fc.size());
+            String jsonStr = Charset.defaultCharset().decode(bb).toString();
+            fc.close();
+            fs.close();
+
+            JSONObject dsmRules = new JSONObject(jsonStr);
+            if (dsmRules.has(packageName)) {
+                dsmRuleList = dsmRules.getJSONArray(packageName);
+                XposedBridge.log("initDSMRules suceeded for " + packageName);
+                return true;
+            } else {
+                return false;
+            }
+        } catch (Exception e) {
+            XposedBridge.log("initDSMRules failed");
+            return false;
+        }
+    }
 }
