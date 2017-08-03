@@ -329,6 +329,11 @@ class JDWPHelper():
         header_data = struct.pack(">Q", ref_id)
         return self.jdwp_conn.request(cmd, header_data)
 
+    def StringReference_Value(self, str_id):
+        cmd = 0x0a01
+        header_data = struct.pack(">Q", str_id)
+        return self.jdwp_conn.request(cmd, header_data)
+
     def EventRequest_Set_METHOD_ENTRY(self, class_pattern):
         return self.EventRequest_Set_workload_classmatch(class_pattern, EVENT_METHOD_ENTRY, SUSPEND_NONE)
 
@@ -380,6 +385,12 @@ class JDWPHelper():
         }
         if return_value[0] not in basic_parser:
             return "unknown", return_value
+        elif return_value[0] == "s":
+            str_type, str_id = basic_parser[return_value[0]](return_value[1:])
+            ident, code, data = self.StringReference_Value(str_id)
+            str_len = struct.unpack(">I", data[:4])[0]
+            str_data = struct.unpack(">%ds" % str_len, data[4:])[0]
+            return (str_type, str_data)
         else:
             return basic_parser[return_value[0]](return_value[1:])
 
