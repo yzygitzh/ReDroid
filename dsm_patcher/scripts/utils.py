@@ -30,26 +30,23 @@ def java_shorty2full(short_sig):
         idx += 1
     return fields[0], parsed_paras
 
-def java_full4jdwp(shorty_sig):
-    class_method, parsed_paras = java_shorty2full(shorty_sig)
-    return "%s(%s)" % (class_method, ",".join(parsed_paras[:-1]))
-
 def java_full4dsm(shorty_sig):
     class_method, parsed_paras = java_shorty2full(shorty_sig)
     return class_method, parsed_paras[:-1], parsed_paras[-1]
 
 def get_monitoring_methods(trace_item_list):
     ret_list = []
-    method_filter = set([")Z", ")B", ")C", ")S", ")I", ")J"])
+    method_filter = set(["Z", "B", "C", "S", "I", "J", "Ljava/lang/String;"])
 
     for trace_item in trace_item_list:
         fields = trace_item.split()
-        sig_end = fields[1][-len(")X"):]
+        sig = fields[1]
+        sig_end = sig[sig.rfind(")") + 1:]
         if sig_end in method_filter:
-            ret_list.append(java_full4jdwp(trace_item))
+            ret_list.append(fields[0])
     return set(ret_list)
 
 def extract_method_classes(methods_list):
     return sorted(list(set([
-        ".".join(x.split("(")[0].split(".")[:-1]) for x in methods_list
+        ".".join(x.split(".")[:-1]) for x in methods_list
     ])))

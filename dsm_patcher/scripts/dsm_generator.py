@@ -71,8 +71,9 @@ def run(config_json_path):
 
                     if trace_method_id not in result_dict[package_name][device_id]:
                         result_dict[package_name][device_id][trace_method_id] = []
-                    reverse_stack_trace = [] + thread_stack_trace[tid]
-                    reverse_stack_trace.reverse()
+                    #reverse_stack_trace = [] + thread_stack_trace[tid]
+                    #reverse_stack_trace.reverse()
+                    reverse_stack_trace = []
                     result_dict[package_name][device_id][trace_method_id].append({
                         "returnValue": monitor_item["returnValue"],
                         "paraList": para_types,

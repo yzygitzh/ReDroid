@@ -366,7 +366,7 @@ class JDWPHelper():
         basic_parser = {
             "Z": lambda x: ("boolean", struct.unpack(">?", x)[0]),
             "B": lambda x: ("byte", chr(struct.unpack(">B", x)[0])),
-            "C": lambda x: ("char", unicode(x)),
+            "C": lambda x: ("char", x.encode("utf8", "ignore")),
             "S": lambda x: ("short", struct.unpack(">h", x)[0]),
             "I": lambda x: ("int", struct.unpack(">i", x)[0]),
             "J": lambda x: ("long", struct.unpack(">q", x)[0]),
@@ -390,7 +390,7 @@ class JDWPHelper():
             ident, code, data = self.StringReference_Value(str_id)
             str_len = struct.unpack(">I", data[:4])[0]
             str_data = struct.unpack(">%ds" % str_len, data[4:])[0]
-            return (str_type, str_data)
+            return (str_type, str_data.decode("utf8", "ignore").encode("utf8"))
         else:
             return basic_parser[return_value[0]](return_value[1:])
 
