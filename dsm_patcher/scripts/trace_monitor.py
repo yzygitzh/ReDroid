@@ -121,7 +121,10 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
             trace_result.append(jdwp_helper.parse_cmd_packets(jdwp.get_cmd_packets()))
 
             with open("%s/%s.json" % (full_output_dir, comparator_result_labels[event_idx]), "w") as trace_result_file:
-                json.dump(trace_result[event_idx], trace_result_file, indent=2)
+                json.dump({
+                    "package_name": package_name,
+                    "monitor_result": trace_result[event_idx]
+                }, trace_result_file, indent=2)
 
         # jdwp un-attach
         jdwp.stop()

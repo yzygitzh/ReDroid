@@ -34,6 +34,10 @@ def java_full4jdwp(shorty_sig):
     class_method, parsed_paras = java_shorty2full(shorty_sig)
     return "%s(%s)" % (class_method, ",".join(parsed_paras[:-1]))
 
+def java_full4dsm(shorty_sig):
+    class_method, parsed_paras = java_shorty2full(shorty_sig)
+    return class_method, parsed_paras[:-1], parsed_paras[-1]
+
 def get_monitoring_methods(trace_item_list):
     ret_list = []
     method_filter = set([")Z", ")B", ")C", ")S", ")I", ")J"])
