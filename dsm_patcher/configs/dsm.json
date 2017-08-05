@@ -1,38 +1,72 @@
 {
-    "diff.strazzere.anti": [
-        {
-            "returnValue": true,
-            "paraList": [],
-            "returnType": "boolean",
-            "classMethodName": "diff.strazzere.anti.MainActivity.isDebugged",
-            "stackTrace": [
-                "diff.strazzere.anti.MainActivity.isDebugged"
-            ]
-        },
-        {
-            "returnValue": 35,
-            "paraList": [
-                "int",
-                "java.lang.String",
-                "java.lang.String"
-            ],
-            "returnType": "int",
-            "classMethodName": "android.util.Log.println",
-            "stackTrace": []
-        },
-        {
-            "returnValue": null,
-            "paraList": [],
-            "returnType": "void",
-            "classMethodName": "diff.strazzere.anti.MainActivity.detectSandbox",
-            "stackTrace": []
-        },
-        {
-            "returnValue": false,
-            "paraList": [],
-            "returnType": "boolean",
-            "classMethodName": "android.os.Debug.isDebuggerConnected",
-            "stackTrace": []
-        }
-    ]
+  "diff.strazzere.anti": [
+    {
+      "stackTrace": [], 
+      "emuReturnValue": true, 
+      "returnValue": false, 
+      "returnType": "boolean", 
+      "classMethodName": "diff.strazzere.anti.debugger.FindDebugger.hasAdbInEmulator", 
+      "paraList": []
+    }, 
+    {
+      "stackTrace": [], 
+      "emuReturnValue": true, 
+      "returnValue": false, 
+      "returnType": "boolean", 
+      "classMethodName": "diff.strazzere.anti.emulator.FindEmulator.hasEmulatorBuild", 
+      "paraList": [
+        "android.content.Context"
+      ]
+    }, 
+    {
+      "stackTrace": [], 
+      "emuReturnValue": 0, 
+      "returnValue": "358239058753973", 
+      "returnType": "string", 
+      "classMethodName": "android.telephony.TelephonyManager.getDeviceId", 
+      "paraList": []
+    }, 
+    {
+      "stackTrace": [], 
+      "emuReturnValue": true, 
+      "returnValue": false, 
+      "returnType": "boolean", 
+      "classMethodName": "diff.strazzere.anti.emulator.FindEmulator.hasQEmuFiles", 
+      "paraList": []
+    }, 
+    {
+      "stackTrace": [], 
+      "emuReturnValue": true, 
+      "returnValue": false, 
+      "returnType": "boolean", 
+      "classMethodName": "diff.strazzere.anti.MainActivity.isQEmuEnvDetected", 
+      "paraList": []
+    }, 
+    {
+      "stackTrace": [], 
+      "emuReturnValue": true, 
+      "returnValue": false, 
+      "returnType": "boolean", 
+      "classMethodName": "diff.strazzere.anti.emulator.FindEmulator.hasEmulatorAdb", 
+      "paraList": []
+    }, 
+    {
+      "stackTrace": [], 
+      "emuReturnValue": "Thread-153", 
+      "returnValue": "Thread-473", 
+      "returnType": "string", 
+      "classMethodName": "java.lang.Thread.getName", 
+      "paraList": []
+    }, 
+    {
+      "stackTrace": [], 
+      "emuReturnValue": 0, 
+      "returnValue": "358239058753973", 
+      "returnType": "string", 
+      "classMethodName": "com.android.internal.telephony.ITelephony$Stub$Proxy.getDeviceId", 
+      "paraList": [
+        "java.lang.String"
+      ]
+    }
+  ]
 }
