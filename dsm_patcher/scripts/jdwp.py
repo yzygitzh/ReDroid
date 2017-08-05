@@ -385,14 +385,13 @@ class JDWPHelper():
         }
         if return_value[0] not in basic_parser:
             return "unknown", return_value
-        elif return_value[0] == "s":
-            str_type, str_id = basic_parser[return_value[0]](return_value[1:])
-            ident, code, data = self.StringReference_Value(str_id)
-            str_len = struct.unpack(">I", data[:4])[0]
-            str_data = struct.unpack(">%ds" % str_len, data[4:])[0]
-            return (str_type, str_data.decode("utf8", "ignore").encode("utf8"))
         else:
-            return basic_parser[return_value[0]](return_value[1:])
+            ret_type, ret_data = basic_parser[return_value[0]](return_value[1:])
+            if ret_type == "string":
+                ident, code, str_data = self.StringReference_Value(ret_data)
+                str_len = struct.unpack(">I", str_data[:4])[0]
+                ret_data = struct.unpack(">%ds" % str_len, str_data[4:])[0].decode("utf8", "ignore").encode("utf8")
+            return ret_type, ret_data
 
     def update_class_method_info_by_class_names(self, class_name_list):
         """
