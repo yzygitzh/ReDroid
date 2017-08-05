@@ -8,6 +8,29 @@ from utils import java_full4dsm
 EVENT_METHOD_ENTRY = 40
 EVENT_METHOD_EXIT_WITH_RETURN_VALUE = 42
 
+def is_critical(data):
+    """
+    Calc whether the return data sequence leads to
+    a critical API
+
+    Currently only allow UNIQUE return value
+    """
+    ret_vals = set([x["returnValue"] for x in data])
+    ret_types = set([x["returnValue"] for x in data])
+    return (len(ret_vals) == 1) and (len(ret_types) == 1)
+
+def gen_dsm(emu_results, real_results):
+    if is_critical(emu_results) and is_critical(real_results):
+        if real_results[0]["returnValue"] != emu_results[0]["returnValue"]:
+            return {
+                "returnValue": real_results[0]["returnValue"],
+                "emuReturnValue": emu_results[0]["returnValue"],
+                "returnType": real_results[0]["returnType"],
+                "stackTrace": real_results[0]["stackTrace"]
+            }
+    else:
+        return None
+
 def run(config_json_path):
     """
     parse config file
@@ -29,7 +52,7 @@ def run(config_json_path):
         monitor_result_paths[device_id] = [os.path.join(monitor_out_dir, device_id, x)
                                            for x in monitor_result_list[device_id]]
 
-    result_dict = {}
+    tmp_result_dict = {}
 
     for common_file_label in common_file_set:
         monitor_result = {}
@@ -44,8 +67,8 @@ def run(config_json_path):
             continue
 
         package_name = monitor_result[emulator_id]["package_name"]
-        if package_name not in result_dict:
-            result_dict[package_name] = {
+        if package_name not in tmp_result_dict:
+            tmp_result_dict[package_name] = {
                 emulator_id: {},
                 real_device_id: {}, # key: method name & signature, value: {returnVal: times}
             }
@@ -69,18 +92,35 @@ def run(config_json_path):
                         if current_frame == class_method:
                             break
 
-                    if trace_method_id not in result_dict[package_name][device_id]:
-                        result_dict[package_name][device_id][trace_method_id] = []
+                    if trace_method_id not in tmp_result_dict[package_name][device_id]:
+                        tmp_result_dict[package_name][device_id][trace_method_id] = {
+                            "paraList": para_types,
+                            "classMethodName": class_method,
+                            "returnData": []
+                        }
                     #reverse_stack_trace = [] + thread_stack_trace[tid]
                     #reverse_stack_trace.reverse()
                     reverse_stack_trace = []
-                    result_dict[package_name][device_id][trace_method_id].append({
+                    tmp_result_dict[package_name][device_id][trace_method_id]["returnData"].append({
                         "returnValue": monitor_item["returnValue"],
-                        "paraList": para_types,
-                        "returnType": ret_type,
-                        "classMethodName": class_method,
+                        "returnType": monitor_item["returnType"],
                         "stackTrace": reverse_stack_trace
                     })
+
+    result_dict = {}
+    # use variance-based heuristic algorithm to find critical APIs
+    for package_name in tmp_result_dict:
+        result_dict[package_name] = []
+        common_method_ids = set(tmp_result_dict[package_name][emulator_id].keys()) & \
+                            set(tmp_result_dict[package_name][real_device_id].keys())
+        for common_method_id in common_method_ids:
+            emu_results = tmp_result_dict[package_name][emulator_id][common_method_id]["returnData"]
+            real_results = tmp_result_dict[package_name][real_device_id][common_method_id]["returnData"]
+            dsm = gen_dsm(emu_results, real_results)
+            if dsm is not None:
+                dsm["paraList"] = tmp_result_dict[package_name][real_device_id][common_method_id]["paraList"]
+                dsm["classMethodName"] = tmp_result_dict[package_name][real_device_id][common_method_id]["classMethodName"]
+                result_dict[package_name].append(dsm)
 
     # output result_dict
     with open(os.path.join(output_dir, "dsm.json"), "w") as output_file:
