@@ -7,27 +7,46 @@ from utils import java_full4dsm
 
 EVENT_METHOD_ENTRY = 40
 EVENT_METHOD_EXIT_WITH_RETURN_VALUE = 42
+THRESHOLD = 10
 
-def is_critical(data):
+def is_critical(emu_data, real_data):
     """
     Calc whether the return data sequence leads to
     a critical API
 
-    Currently only allow UNIQUE return value
+    Currently only allow
+    1. both emu/real UNIQUE return value
+    2. emu and real have common prefix >= 1
     """
-    ret_vals = set([x["returnValue"] for x in data])
-    ret_types = set([x["returnValue"] for x in data])
-    return (len(ret_vals) == 1) and (len(ret_types) == 1)
+    emu_rets = [(x["returnType"], x["returnValue"]) for x in emu_data]
+    real_rets = [(x["returnType"], x["returnValue"]) for x in real_data]
+
+    min_ret_len = min(len(emu_rets), len(real_rets))
+    if min_ret_len > THRESHOLD:
+        return False
+
+    common_prefix_len = 0
+    while common_prefix_len < min_ret_len and \
+          emu_rets[common_prefix_len] == real_rets[common_prefix_len]:
+        common_prefix_len += 1
+
+    if (len(set(emu_rets)) == 1 and len(set(real_rets)) == 1):
+        if (emu_rets[0] != real_rets[0]):
+            return True
+    elif 0 < common_prefix_len < min_ret_len:
+        return True
+
+    return False
 
 def gen_dsm(emu_results, real_results):
-    if is_critical(emu_results) and is_critical(real_results):
-        if real_results[0]["returnValue"] != emu_results[0]["returnValue"]:
-            return {
-                "returnValue": real_results[0]["returnValue"],
-                "emuReturnValue": emu_results[0]["returnValue"],
-                "returnType": real_results[0]["returnType"],
-                "stackTrace": real_results[0]["stackTrace"]
-            }
+    # if is_critical(emu_results) and is_critical(real_results):
+    if is_critical(emu_results, real_results):
+        return {
+            "returnValue": list([x["returnValue"] for x in real_results]),
+            "emuReturnValue": list([x["returnValue"] for x in emu_results]),
+            "returnType": real_results[0]["returnType"],
+            "stackTrace": real_results[0]["stackTrace"]
+        }
     else:
         return None
 
