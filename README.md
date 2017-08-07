@@ -6,7 +6,7 @@ ReDroid is a toolbox for **detecting and countering** anti-sandbox behaviors in 
 
 * What is anti-sandbox behavior
 
-    Anti-sandbox behavior implies that an app would check whether it's being run on an real device or an emulator, and have different behaviors on both kinds of platforms. This may be necessary for commercial apps to pretend malicious usage (like cheating in a game) and for malware to escape automatic app analysis and attack most valuable targets.
+    Anti-sandbox behavior implies that an app would check whether it's being run on an real device or an emulator, and behave differently on them. This may be necessary for commercial apps to pretend malicious usage (like cheating in a game) and for malware to escape from dynamic app analysis and attack most valuable targets.
 
     Known Android apps equipped with anti-sandbox techniques include Wechat (commercial app), Collapse Gakuen 2 (game) and DenDroid (malware).
 
@@ -16,7 +16,7 @@ ReDroid is a toolbox for **detecting and countering** anti-sandbox behaviors in 
 
     1. Detecting Phase: ReDroid runs it on both real and emulator platforms, collects runtime traces and compares the real traces against emulator traces. Apps equipped with anti-sandbox techniques would have (largely) different behaviors, thus different traces are generated on real and emulator platforms. From that ReDroid detect anti-sandbox behaviors.
 
-    2. Countering Phase: ReDroid replays the app with JDWP monitor enabled, collecting critical methods' return values. Then corresponding DSM (dynamic state modification) rule is **automatically** generated and passed to [Xposed][xposed], making what critical methods return in emulator the same as in real devices.
+    2. Countering Phase: ReDroid replays the app with JDWP monitor enabled, collecting some critical methods' return values. Then corresponding DSM (dynamic state modification) rule is **automatically** generated and passed to [Xposed][xposed], making what critical methods return in emulator the same as in real devices, neutralizing potential anti-sandbox behaviors.
 
 ## Prerequisites
 
