@@ -7,9 +7,8 @@ from utils import java_full4dsm
 
 EVENT_METHOD_ENTRY = 40
 EVENT_METHOD_EXIT_WITH_RETURN_VALUE = 42
-THRESHOLD = 10
 
-def is_critical(emu_data, real_data):
+def is_critical(emu_data, real_data, divergence_threshold):
     """
     Calc whether the return data sequence leads to
     a critical API
@@ -22,7 +21,7 @@ def is_critical(emu_data, real_data):
     real_rets = [(x["returnType"], x["returnValue"]) for x in real_data]
 
     min_ret_len = min(len(emu_rets), len(real_rets))
-    if min_ret_len > THRESHOLD:
+    if min_ret_len > divergence_threshold:
         return False
 
     common_prefix_len = 0
@@ -38,9 +37,9 @@ def is_critical(emu_data, real_data):
 
     return False
 
-def gen_dsm(emu_results, real_results):
+def gen_dsm(emu_results, real_results, divergence_threshold):
     # if is_critical(emu_results) and is_critical(real_results):
-    if is_critical(emu_results, real_results):
+    if is_critical(emu_results, real_results, divergence_threshold):
         return {
             "returnValue": list([x["returnValue"] for x in real_results]),
             "emuReturnValue": list([x["returnValue"] for x in emu_results]),
@@ -60,6 +59,7 @@ def run(config_json_path):
     output_dir = os.path.abspath(config_json["output_dir"])
     emulator_id = config_json["emulator_id"]
     real_device_id = config_json["real_device_id"]
+    divergence_threshold = config_json["divergence_threshold"]
 
     monitor_result_list = {}
     for device_id in [emulator_id, real_device_id]:
@@ -135,7 +135,7 @@ def run(config_json_path):
         for common_method_id in common_method_ids:
             emu_results = tmp_result_dict[package_name][emulator_id][common_method_id]["returnData"]
             real_results = tmp_result_dict[package_name][real_device_id][common_method_id]["returnData"]
-            dsm = gen_dsm(emu_results, real_results)
+            dsm = gen_dsm(emu_results, real_results, divergence_threshold)
             if dsm is not None:
                 dsm["paraList"] = tmp_result_dict[package_name][real_device_id][common_method_id]["paraList"]
                 dsm["classMethodName"] = tmp_result_dict[package_name][real_device_id][common_method_id]["classMethodName"]
