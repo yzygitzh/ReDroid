@@ -3,48 +3,62 @@ import os
 import argparse
 import subprocess
 
-from utils import java_full4dsm
+from utils import java_full4dsm, get_irrelevant_packages, clean_stack_trace
 
 EVENT_METHOD_ENTRY = 40
 EVENT_METHOD_EXIT_WITH_RETURN_VALUE = 42
 
-def is_critical(emu_data, real_data, divergence_threshold):
+def is_critical(emu_data, real_data, divergence_threshold, ex_package_set):
     """
     Calc whether the return data sequence leads to
     a critical API
 
-    Currently only allow
+    Currently only consider
+    0. have something ASIDE FROM ex_package_set
     1. both emu/real UNIQUE return value
     2. emu and real have common prefix >= 1
     """
+    emu_stack_trace_set = set(emu_data[0]["stackTrace"])
+    real_stack_trace_set = set(real_data[0]["stackTrace"])
+    if len(clean_stack_trace(emu_stack_trace_set, ex_package_set)) == 0 or \
+       len(clean_stack_trace(real_stack_trace_set, ex_package_set)) == 0:
+        return False
+
     emu_rets = [(x["returnType"], x["returnValue"]) for x in emu_data]
     real_rets = [(x["returnType"], x["returnValue"]) for x in real_data]
 
-    min_ret_len = min(len(emu_rets), len(real_rets))
-    if min_ret_len > divergence_threshold:
-        return False
+    #min_ret_len = min(len(emu_rets), len(real_rets))
+    #if min_ret_len > divergence_threshold:
+    #    return False
 
-    common_prefix_len = 0
-    while common_prefix_len < min_ret_len and \
-          emu_rets[common_prefix_len] == real_rets[common_prefix_len]:
-        common_prefix_len += 1
+    #common_prefix_len = 0
+    #while common_prefix_len < min_ret_len and \
+    #      emu_rets[common_prefix_len] == real_rets[common_prefix_len]:
+    #    common_prefix_len += 1
 
     if (len(set(emu_rets)) == 1 and len(set(real_rets)) == 1):
-        if (emu_rets[0] != real_rets[0]):
+    #if len(set(real_rets)) == 1:
+        if (emu_rets[0] != real_rets[0]) and \
+           (not (emu_rets[0][0] == "object" and emu_rets[0][1] != 0)) and \
+           (not (real_rets[0][0] == "object" and real_rets[0][1] != 0)):
             return True
-    elif 0 < common_prefix_len < min_ret_len:
-        return True
+    #elif 0 < common_prefix_len < min_ret_len:
+    #    return True
 
     return False
 
-def gen_dsm(emu_results, real_results, divergence_threshold):
+def gen_dsm(emu_results, real_results, divergence_threshold, ex_package_set):
     # if is_critical(emu_results) and is_critical(real_results):
-    if is_critical(emu_results, real_results, divergence_threshold):
+    if is_critical(emu_results, real_results, divergence_threshold, ex_package_set):
         return {
-            "returnValue": list([x["returnValue"] for x in real_results]),
-            "emuReturnValue": list([x["returnValue"] for x in emu_results]),
+            #"returnValue": list([x["returnValue"] for x in real_results]),
+            #"emuReturnValue": list([x["returnValue"] for x in emu_results]),
+            "returnValue": real_results[0]["returnValue"],
+            "emuReturnValue": emu_results[0]["returnValue"],
             "returnType": real_results[0]["returnType"],
-            "stackTrace": real_results[0]["stackTrace"]
+            "emuReturnType": emu_results[0]["returnType"],
+            #"stackTrace": real_results[0]["stackTrace"],
+            "emuStackTrace": emu_results[0]["stackTrace"],
         }
     else:
         return None
@@ -60,6 +74,9 @@ def run(config_json_path):
     emulator_id = config_json["emulator_id"]
     real_device_id = config_json["real_device_id"]
     divergence_threshold = config_json["divergence_threshold"]
+
+    # get irrelevant classes
+    ex_package_set = get_irrelevant_packages(config_json["irrelevant_packages"])
 
     monitor_result_list = {}
     for device_id in [emulator_id, real_device_id]:
@@ -104,8 +121,15 @@ def run(config_json_path):
                 if monitor_item["eventKind"] == EVENT_METHOD_ENTRY:
                     thread_stack_trace[tid].append(monitor_item["classMethodName"])
                 elif monitor_item["eventKind"] == EVENT_METHOD_EXIT_WITH_RETURN_VALUE:
-                    trace_method_id = "%s %s" % (monitor_item["classMethodName"], monitor_item["signature"])
-                    class_method, para_types, ret_type = java_full4dsm(trace_method_id)
+                    reverse_stack_trace = [] + thread_stack_trace[tid]
+                    reverse_stack_trace.reverse()
+                    reverse_stack_trace_str = ";".join(reverse_stack_trace)
+
+                    trace_method_id = "%s %s %s" % (monitor_item["classMethodName"],
+                                                    monitor_item["signature"],
+                                                    reverse_stack_trace_str)
+
+                    class_method, para_types, ret_type = java_full4dsm(" ".join(trace_method_id.split()[:2]))
                     while len(thread_stack_trace[tid]):
                         current_frame = thread_stack_trace[tid].pop()
                         if current_frame == class_method:
@@ -117,9 +141,7 @@ def run(config_json_path):
                             "classMethodName": class_method,
                             "returnData": []
                         }
-                    #reverse_stack_trace = [] + thread_stack_trace[tid]
-                    #reverse_stack_trace.reverse()
-                    reverse_stack_trace = []
+                    # reverse_stack_trace = []
                     tmp_result_dict[package_name][device_id][trace_method_id]["returnData"].append({
                         "returnValue": monitor_item["returnValue"],
                         "returnType": monitor_item["returnType"],
@@ -135,7 +157,7 @@ def run(config_json_path):
         for common_method_id in common_method_ids:
             emu_results = tmp_result_dict[package_name][emulator_id][common_method_id]["returnData"]
             real_results = tmp_result_dict[package_name][real_device_id][common_method_id]["returnData"]
-            dsm = gen_dsm(emu_results, real_results, divergence_threshold)
+            dsm = gen_dsm(emu_results, real_results, divergence_threshold, ex_package_set)
             if dsm is not None:
                 dsm["paraList"] = tmp_result_dict[package_name][real_device_id][common_method_id]["paraList"]
                 dsm["classMethodName"] = tmp_result_dict[package_name][real_device_id][common_method_id]["classMethodName"]

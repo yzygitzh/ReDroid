@@ -3,5 +3,21 @@
     "real_device_id": "06495bbe0ac5b3d1",
     "monitor_out": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_dsm/monitor/",
     "output_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_dsm/dsm/",
-    "divergence_threshold": 10
+    "divergence_threshold": 10,
+    "irrelevant_packages": {
+        "jars": [
+            "/mnt/EXT_volume/Android/Sdk/platforms/android-24/android.jar",
+            "/mnt/EXT_volume/Android/Sdk/platforms/android-24/data/layoutlib.jar",
+            "/mnt/EXT_volume/Android/Sdk/platforms/android-24/optional/org.apache.http.legacy.jar",
+            "/mnt/EXT_volume/Android/Sdk/platforms/android-24/uiautomator.jar",
+            "/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar"
+        ],
+        "names": [
+            "com.android.dex",
+            "libcore",
+            "org.chromium",
+            "org.android_x86"
+        ],
+        "libs": "/mnt/EXT_volume/projects/ReDroid/anti_sandbox_detector/data/lib_packages.csv"
+    }
 }
