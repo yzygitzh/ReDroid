@@ -29,6 +29,7 @@ TRACE_MONITOR_CONFIG_OUTPUT_DIR = os.path.join("ReDroid_dsm", "monitor")
 
 # dsm_generator_config.json default items
 DSM_GENERATOR_CONFIG_DIVERGENCE_THRESHOLD = 10
+DSM_GENERATOR_CONFIG_OUTPUT_DIR = os.path.join("ReDroid_dsm", "dsm")
 
 def run(config_json_path):
     """
@@ -65,9 +66,9 @@ def run(config_json_path):
     config_file_path = os.path.join(config_dir, "trace_collector_config.json")
     with open(config_file_path, "w") as config_file:
         json.dump(trace_collector_config, config_file, indent=2)
-    #p = subprocess.Popen(["python", os.path.join(redroid_path, "anti_sandbox_detector", "scripts", "trace_collector.py"),
-    #                      "-c", config_file_path])
-    #p.wait()
+    p = subprocess.Popen(["python", os.path.join(redroid_path, "anti_sandbox_detector", "scripts", "trace_collector.py"),
+                          "-c", config_file_path])
+    p.wait()
 
     # 2. trace_comparator
     trace_comparator_config = {
@@ -103,8 +104,8 @@ def run(config_json_path):
     trace_monitor_config = {
         "real_device_id": real_device_id,
         "emulator_id": emulator_id,
-        "real_device_droidbot_out_dir": os.path.join(trace_collector_config["output_dir"], real_device_id),
-        "emulator_droidbot_out_dir": os.path.join(trace_collector_config["output_dir"], emulator_id),
+        "real_device_droidbot_out_dir": trace_comparator_config["real_device_droidbot_out_dir"],
+        "emulator_droidbot_out_dir": trace_comparator_config["emulator_droidbot_out_dir"],
         "trace_comparator_out_dir": trace_comparator_config["output_dir"],
         "apk_dir": apk_dir,
         "output_dir": os.path.join(output_dir, TRACE_MONITOR_CONFIG_OUTPUT_DIR),
@@ -124,7 +125,7 @@ def run(config_json_path):
         "emulator_id": emulator_id,
         "real_device_id": real_device_id,
         "monitor_out": trace_monitor_config["output_dir"],
-        "output_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_dsm/dsm/",
+        "output_dir": os.path.join(output_dir, DSM_GENERATOR_CONFIG_OUTPUT_DIR),
         "divergence_threshold": DSM_GENERATOR_CONFIG_DIVERGENCE_THRESHOLD,
         "irrelevant_packages": trace_comparator_config["irrelevant_packages"]
     }
