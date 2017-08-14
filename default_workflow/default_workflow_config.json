@@ -1,0 +1,10 @@
+{
+    "emulator_id": "162.105.87.77:5555",
+    "real_device_id": "06495bbe0ac5b3d1",
+    "apk_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_apps_test/",
+    "output_dir": "/mnt/EXT_volume/lab_data/ReDroid/ReDroid_default_out/",
+    "jdk_path": "/usr/lib/jvm/java-8-openjdk-amd64/",
+    "android_sdk_path": "/mnt/EXT_volume/Android/Sdk/",
+    "redroid_path": "/mnt/EXT_volume/projects/ReDroid/",
+    "process_num": 8
+}
