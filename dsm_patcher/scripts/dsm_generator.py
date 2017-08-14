@@ -164,6 +164,10 @@ def run(config_json_path):
                 result_dict[package_name].append(dsm)
 
     # output result_dict
+    if os.system("mkdir -p %s" % output_dir):
+        print "failed mkdir -p %s" % output_dir
+        return
+
     with open(os.path.join(output_dir, "dsm.json"), "w") as output_file:
         json.dump(result_dict, output_file, indent=2)
 
