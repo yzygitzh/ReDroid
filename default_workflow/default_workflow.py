@@ -31,6 +31,12 @@ TRACE_MONITOR_CONFIG_OUTPUT_DIR = os.path.join("ReDroid_dsm", "monitor")
 DSM_GENERATOR_CONFIG_DIVERGENCE_THRESHOLD = 10
 DSM_GENERATOR_CONFIG_OUTPUT_DIR = os.path.join("ReDroid_dsm", "dsm")
 
+# emulator path of dsm.json
+EMULATOR_DSM_PATH = "/data/system/ReDroid/dsm.json"
+
+# ReDroid apk path
+REDROID_APK_PATH = os.path.join("app_samples", "redroid.apk")
+
 def run(config_json_path):
     """
     parse config file
@@ -135,6 +141,15 @@ def run(config_json_path):
     p = subprocess.Popen(["python", os.path.join(redroid_path, "dsm_patcher", "scripts", "dsm_generator.py"),
                           "-c", config_file_path])
     p.wait()
+
+    # 5. push dsm.json to emulator
+    p = subprocess.Popen(["adb", "-s", emulator_id, "push",
+                          os.path.join(dsm_generator_config["output_dir"], "dsm.json"), EMULATOR_DSM_PATH])
+    p.wait()
+
+    # 6. install ReDroid app
+    p = subprocess.Popen(["adb", "-s", emulator_id, "install",
+                          os.path.join(redroid_path, REDROID_APK_PATH)])
 
 
 def parse_args():
