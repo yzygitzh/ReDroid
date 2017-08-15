@@ -63,7 +63,7 @@ Apart from the default workflow, the tools in each phase can be used separately.
 ## Related Projects
 
 1. [DroidBot][droidbot]: A lightweight test input generator for Android. Used in ReDroid for dynamic testing Android apps.
-2. [anti-emulator][anti-emulator]: An emulator detector. One of the sample apps.
+2. [anti-emulator][anti-emulator] (based on an [origin version][anti-emulator-origin]): An emulator detector. One of the sample apps.
 3. [DenDroid][dendroid]: An Android Trojan equipped with anti-sandbox techniques. One of the sample apps.
 4. [LibRadar][libradar]: A detecting tool for 3rd-party libraries in Android apps. Its 3rd party library package detection results is used for trace comparing in ReDroid.
 5. [AOSP][aosp]: Android Open Source Project
@@ -72,6 +72,7 @@ Apart from the default workflow, the tools in each phase can be used separately.
 
 [droidbot]: https://github.com/honeynet/droidbot
 [anti-emulator]: https://github.com/yzygitzh/anti-emulator
+[anti-emulator-origin]: https://github.com/strazzere/anti-emulator
 [aosp]: https://source.android.com/
 [andx86]: http://www.android-x86.org/
 [dendroid]: https://github.com/yzygitzh/dendroid_apk
