@@ -77,6 +77,5 @@ Apart from the default workflow, the tools in each phase can be used separately.
 [andx86]: http://www.android-x86.org/
 [dendroid]: https://github.com/yzygitzh/dendroid_apk
 [libradar]: https://github.com/pkumza/LibRadar
-[andx86_vb]: http://www.android-x86.org/documents/virtualboxhowto
 [prebuilt-imgs]: https://www.dropbox.com/s/yieoxl9i4chzg4x/ReDroid_img.tar.gz?dl=0
 [xposed]: http://repo.xposed.info/
