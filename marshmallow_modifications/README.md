@@ -6,6 +6,16 @@ This folder contains several modifications and enhancements on Android system fo
 
 **Note: Files in this folder should be used only if one wants to build and configure Android image from source. For common usage of ReDroid, please use the [prebuilt images][prebuilt-imgs] (for VirtualBox and Google Nexus 5).**
 
+## Prebuilt Image Usage
+
+There are two folders in the archive:
+
+1. `android-x86`: Import the `android-x96-anti-sandbox.ova` file in the folder to VirtualBox directly.
+
+2. `hammerhead`: These are the images built for Google Nexus 5. Use `adb reboot bootloader` and `fastboot flashall -w` to flash them into your Google Nexus 5.
+
+**Note that one can build & configure images for any other devices that supported by AOSP branch `android-6.0.1_r77`.**
+
 ## Description
 
 ### Patch files
