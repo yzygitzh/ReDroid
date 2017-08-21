@@ -1,4 +1,4 @@
-# anti_sandbox_detector
+# Anti-Sandbox Detector
 
 ## Introduction
 
@@ -23,6 +23,8 @@ Utilities in `scripts` folder are called with corresponding config files in `con
             "output_dir": <output-directory>
         }
 
+    See `configs/trace_collector_config.json` for example.
+
 2. scripts/trace_comparator.py
 
     `$ python scripts/trace_comparator.py -c configs/trace_comparator_config.json`
@@ -41,3 +43,5 @@ Utilities in `scripts` folder are called with corresponding config files in `con
                 "libs": <path-to-libradar's-lib_packages.csv>
             }
         }
+
+    See `configs/trace_comparator_config.json` for example.
