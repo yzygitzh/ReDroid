@@ -27,7 +27,7 @@ Utilities in `scripts` folder are called with corresponding config files in `con
 
     `$ python scripts/trace_comparator.py -c configs/trace_comparator_config.json`
 
-    Compare runtime trace collected. Configured by `trace_comparator_config.json`:
+    This utility compares runtime trace collected. Configured by `trace_comparator_config.json`:
 
         {
             "real_device_droidbot_out_dir": <path-to-droidbot-output-for-real-device>,
