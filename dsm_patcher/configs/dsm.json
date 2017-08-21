@@ -1,15 +1,130 @@
 {
   "diff.strazzere.anti": [
     {
-      "stackTrace": [], 
-      "emuReturnValue": true, 
-      "returnValue": false, 
-      "returnType": "boolean", 
-      "classMethodName": "diff.strazzere.anti.debugger.FindDebugger.hasAdbInEmulator", 
+      "stackTrace": [
+        "android.telephony.TelephonyManager.getDeviceId", 
+        "diff.strazzere.anti.emulator.FindEmulator.hasKnownDeviceId", 
+        "diff.strazzere.anti.MainActivity.isQEmuEnvDetected"
+      ], 
+      "emuReturnType": "object", 
+      "emuReturnValue": 0, 
+      "returnValue": "358239058753973", 
+      "returnType": "string", 
+      "classMethodName": "android.telephony.TelephonyManager.getDeviceId", 
       "paraList": []
     }, 
     {
-      "stackTrace": [], 
+      "stackTrace": [
+        "diff.strazzere.anti.emulator.FindEmulator.hasEmulatorAdb", 
+        "diff.strazzere.anti.MainActivity.isQEmuEnvDetected"
+      ], 
+      "emuReturnType": "boolean", 
+      "emuReturnValue": true, 
+      "returnValue": false, 
+      "returnType": "boolean", 
+      "classMethodName": "diff.strazzere.anti.emulator.FindEmulator.hasEmulatorAdb", 
+      "paraList": []
+    }, 
+    {
+      "stackTrace": [
+        "libcore.io.IoBridge.read", 
+        "java.io.FileInputStream.read", 
+        "java.io.InputStreamReader.read", 
+        "java.io.BufferedReader.fillBuf", 
+        "java.io.BufferedReader.readLine", 
+        "diff.strazzere.anti.debugger.FindDebugger.hasTracerPid", 
+        "diff.strazzere.anti.MainActivity.isDebugged"
+      ], 
+      "emuReturnType": "int", 
+      "emuReturnValue": 822, 
+      "returnValue": 759, 
+      "returnType": "int", 
+      "classMethodName": "libcore.io.IoBridge.read", 
+      "paraList": [
+        "java.io.FileDescriptor", 
+        "byte[]", 
+        "int", 
+        "int"
+      ]
+    }, 
+    {
+      "stackTrace": [
+        "android.os.Parcel.readString", 
+        "com.android.internal.telephony.ITelephony$Stub$Proxy.getDeviceId", 
+        "android.telephony.TelephonyManager.getDeviceId", 
+        "diff.strazzere.anti.emulator.FindEmulator.hasKnownDeviceId", 
+        "diff.strazzere.anti.MainActivity.isQEmuEnvDetected"
+      ], 
+      "emuReturnType": "object", 
+      "emuReturnValue": 0, 
+      "returnValue": "358239058753973", 
+      "returnType": "string", 
+      "classMethodName": "android.os.Parcel.readString", 
+      "paraList": []
+    }, 
+    {
+      "stackTrace": [
+        "libcore.io.BlockGuardOs.read", 
+        "libcore.io.IoBridge.read", 
+        "java.io.FileInputStream.read", 
+        "java.io.InputStreamReader.read", 
+        "java.io.BufferedReader.fillBuf", 
+        "java.io.BufferedReader.readLine", 
+        "diff.strazzere.anti.debugger.FindDebugger.hasTracerPid", 
+        "diff.strazzere.anti.MainActivity.isDebugged"
+      ], 
+      "emuReturnType": "int", 
+      "emuReturnValue": 822, 
+      "returnValue": 759, 
+      "returnType": "int", 
+      "classMethodName": "libcore.io.BlockGuardOs.read", 
+      "paraList": [
+        "java.io.FileDescriptor", 
+        "byte[]", 
+        "int", 
+        "int"
+      ]
+    }, 
+    {
+      "stackTrace": [
+        "java.io.FileInputStream.read", 
+        "java.io.InputStreamReader.read", 
+        "java.io.BufferedReader.fillBuf", 
+        "java.io.BufferedReader.readLine", 
+        "diff.strazzere.anti.debugger.FindDebugger.hasTracerPid", 
+        "diff.strazzere.anti.MainActivity.isDebugged"
+      ], 
+      "emuReturnType": "int", 
+      "emuReturnValue": 822, 
+      "returnValue": 759, 
+      "returnType": "int", 
+      "classMethodName": "java.io.FileInputStream.read", 
+      "paraList": [
+        "byte[]", 
+        "int", 
+        "int"
+      ]
+    }, 
+    {
+      "stackTrace": [
+        "java.io.BufferedReader.fillBuf", 
+        "java.io.BufferedReader.readLine", 
+        "diff.strazzere.anti.debugger.FindDebugger.hasTracerPid", 
+        "diff.strazzere.anti.MainActivity.isDebugged"
+      ], 
+      "emuReturnType": "int", 
+      "emuReturnValue": 822, 
+      "returnValue": 759, 
+      "returnType": "int", 
+      "classMethodName": "java.io.BufferedReader.fillBuf", 
+      "paraList": []
+    }, 
+    {
+      "stackTrace": [
+        "diff.strazzere.anti.emulator.FindEmulator.hasEmulatorBuild", 
+        "diff.strazzere.anti.MainActivity.isQEmuEnvDetected"
+      ], 
+      "emuReturnType": "boolean", 
       "emuReturnValue": true, 
       "returnValue": false, 
       "returnType": "boolean", 
@@ -19,23 +134,10 @@
       ]
     }, 
     {
-      "stackTrace": [], 
-      "emuReturnValue": 0, 
-      "returnValue": "358239058753973", 
-      "returnType": "string", 
-      "classMethodName": "android.telephony.TelephonyManager.getDeviceId", 
-      "paraList": []
-    }, 
-    {
-      "stackTrace": [], 
-      "emuReturnValue": true, 
-      "returnValue": false, 
-      "returnType": "boolean", 
-      "classMethodName": "diff.strazzere.anti.emulator.FindEmulator.hasQEmuFiles", 
-      "paraList": []
-    }, 
-    {
-      "stackTrace": [], 
+      "stackTrace": [
+        "diff.strazzere.anti.MainActivity.isQEmuEnvDetected"
+      ], 
+      "emuReturnType": "boolean", 
       "emuReturnValue": true, 
       "returnValue": false, 
       "returnType": "boolean", 
@@ -43,23 +145,13 @@
       "paraList": []
     }, 
     {
-      "stackTrace": [], 
-      "emuReturnValue": true, 
-      "returnValue": false, 
-      "returnType": "boolean", 
-      "classMethodName": "diff.strazzere.anti.emulator.FindEmulator.hasEmulatorAdb", 
-      "paraList": []
-    }, 
-    {
-      "stackTrace": [], 
-      "emuReturnValue": "Thread-153", 
-      "returnValue": "Thread-473", 
-      "returnType": "string", 
-      "classMethodName": "java.lang.Thread.getName", 
-      "paraList": []
-    }, 
-    {
-      "stackTrace": [], 
+      "stackTrace": [
+        "com.android.internal.telephony.ITelephony$Stub$Proxy.getDeviceId", 
+        "android.telephony.TelephonyManager.getDeviceId", 
+        "diff.strazzere.anti.emulator.FindEmulator.hasKnownDeviceId", 
+        "diff.strazzere.anti.MainActivity.isQEmuEnvDetected"
+      ], 
+      "emuReturnType": "object", 
       "emuReturnValue": 0, 
       "returnValue": "358239058753973", 
       "returnType": "string", 
@@ -67,6 +159,102 @@
       "paraList": [
         "java.lang.String"
       ]
+    }, 
+    {
+      "stackTrace": [
+        "java.lang.ThreadLocal.-get0", 
+        "diff.strazzere.anti.debugger.FindDebugger.hasTracerPid", 
+        "diff.strazzere.anti.MainActivity.isDebugged"
+      ], 
+      "emuReturnType": "int", 
+      "emuReturnValue": -1013904242, 
+      "returnValue": 0, 
+      "returnType": "int", 
+      "classMethodName": "java.lang.ThreadLocal.-get0", 
+      "paraList": [
+        "java.lang.ThreadLocal"
+      ]
+    }, 
+    {
+      "stackTrace": [
+        "diff.strazzere.anti.emulator.FindEmulator.hasQEmuFiles", 
+        "diff.strazzere.anti.MainActivity.isQEmuEnvDetected"
+      ], 
+      "emuReturnType": "boolean", 
+      "emuReturnValue": true, 
+      "returnValue": false, 
+      "returnType": "boolean", 
+      "classMethodName": "diff.strazzere.anti.emulator.FindEmulator.hasQEmuFiles", 
+      "paraList": []
+    }, 
+    {
+      "stackTrace": [
+        "java.io.InputStreamReader.read", 
+        "java.io.BufferedReader.fillBuf", 
+        "java.io.BufferedReader.readLine", 
+        "diff.strazzere.anti.debugger.FindDebugger.hasTracerPid", 
+        "diff.strazzere.anti.MainActivity.isDebugged"
+      ], 
+      "emuReturnType": "int", 
+      "emuReturnValue": 822, 
+      "returnValue": 759, 
+      "returnType": "int", 
+      "classMethodName": "java.io.InputStreamReader.read", 
+      "paraList": [
+        "char[]", 
+        "int", 
+        "int"
+      ]
+    }, 
+    {
+      "stackTrace": [
+        "java.io.FileDescriptor.getInt$", 
+        "diff.strazzere.anti.debugger.FindDebugger.hasTracerPid", 
+        "diff.strazzere.anti.MainActivity.isDebugged"
+      ], 
+      "emuReturnType": "int", 
+      "emuReturnValue": 17, 
+      "returnValue": 22, 
+      "returnType": "int", 
+      "classMethodName": "java.io.FileDescriptor.getInt$", 
+      "paraList": []
+    }, 
+    {
+      "stackTrace": [
+        "libcore.io.Posix.read", 
+        "libcore.io.BlockGuardOs.read", 
+        "libcore.io.IoBridge.read", 
+        "java.io.FileInputStream.read", 
+        "java.io.InputStreamReader.read", 
+        "java.io.BufferedReader.fillBuf", 
+        "java.io.BufferedReader.readLine", 
+        "diff.strazzere.anti.debugger.FindDebugger.hasTracerPid", 
+        "diff.strazzere.anti.MainActivity.isDebugged"
+      ], 
+      "emuReturnType": "int", 
+      "emuReturnValue": 822, 
+      "returnValue": 759, 
+      "returnType": "int", 
+      "classMethodName": "libcore.io.Posix.read", 
+      "paraList": [
+        "java.io.FileDescriptor", 
+        "byte[]", 
+        "int", 
+        "int"
+      ]
+    }, 
+    {
+      "stackTrace": [
+        "java.io.File.exists", 
+        "diff.strazzere.anti.emulator.FindEmulator.hasQEmuFiles", 
+        "diff.strazzere.anti.MainActivity.isQEmuEnvDetected"
+      ], 
+      "emuReturnType": "boolean", 
+      "emuReturnValue": true, 
+      "returnValue": false, 
+      "returnType": "boolean", 
+      "classMethodName": "java.io.File.exists", 
+      "paraList": []
     }
   ]
 }

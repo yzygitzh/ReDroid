@@ -58,7 +58,7 @@ def gen_dsm(emu_results, real_results, divergence_threshold, ex_package_set):
             "returnType": real_results[0]["returnType"],
             "emuReturnType": emu_results[0]["returnType"],
             #"stackTrace": real_results[0]["stackTrace"],
-            "emuStackTrace": emu_results[0]["stackTrace"],
+            "stackTrace": emu_results[0]["stackTrace"],
         }
     else:
         return None
