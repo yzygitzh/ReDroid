@@ -1,4 +1,4 @@
-# marshmallow_modifications
+# Marshmallow Modifications
 
 ## Introduction
 
