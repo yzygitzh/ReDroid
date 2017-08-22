@@ -12,7 +12,18 @@ There are two folders in the archive:
 
 1. `android-x86`: Import the `android-x96-anti-sandbox.ova` file in the folder to VirtualBox directly.
 
-2. `hammerhead`: These are the images built for Google Nexus 5. Use `adb reboot bootloader` and `fastboot flashall -w` to flash them into your Google Nexus 5.
+2. `hammerhead`: These are the images built for Google Nexus 5. To flash them into the device, do the following:
+
+        $ cd hammerhead
+        $ adb reboot bootloader
+
+    Wait the device until it enters fastboot mode. Check it with
+
+        $ fastboot devices
+
+    If there is something, flash the images by
+
+        $ ANDROID_PRODUCT_OUT=. fastboot flashall -w
 
 **Note that one can build & configure images for any other devices that supported by AOSP branch `android-6.0.1_r77`.**
 
@@ -30,10 +41,14 @@ All patch files are under `patches` folder, having name `0001-anti-sandbox-patch
 
 [Android x86][andx86] patches are under `patches/android-x86` folder:
 
+1. `bootable/newinstaller`: (Optional) Enable direct live image boot with a custom vertical video mode. **DON'T apply this patch if you want to install Android x86 to hard disk, which is necessary for DSM part of ReDroid**
+2. `build/` and `external/mesa`: Compile error fix.
+3. `device/generic/common`: Make `enable_nativebridge` utility read `houdini.sfs` from SD card.
+4. `framework/base/`: Same as the one in AOSP.
+
 ### Other files
 
 1. `generate_patch.sh`: generate patches from original source repos. Modify the project paths to your own version in the script before using.
-
 2. `libs/houdini.sfs`: Intel's support library for ARM native code. Used by Android x86 virtual machine if one wants to run ReDroid on apps with ARM native part.
 
 ## Build & Configure Instruction
@@ -47,35 +62,34 @@ All patch files are under `patches` folder, having name `0001-anti-sandbox-patch
     * Real Device
 
         1. Apply patches in `aosp` folder to [AOSP source][aosp] branch `android-6.0.1_r77` according to the description part
-        2. Select the build target as `user` mode on real device, e.g. `aosp_hammerhead-userdebug`
-        3. Build the ROM
-        4. Flash the ROM into your device
+        2. Select the build target as `user` mode on real device, e.g. `aosp_hammerhead-userdebug`, then build and flash the ROM according to [official instructions][aosp_build]
 
     * Emulator
 
         1. Apply patches in `android-x86` folder to [Android x86 source][andx86] branch `android-x86-6.0-r3` according to the description part
-        2. Select the build target as `android_x86-eng`
-        3. Build the ISO
-        4. Create a new Virtual Machine in VirtualBox according to the [official documents][andx86_vb]
-        5. Create a custom video mode by
+        2. Select the build target as `android_x86-eng` and build the ISO according to [official instructions][andx86_build]
+        3. Create a new Virtual Machine in VirtualBox according to the [official documents][andx86_vb], and set the VM's network to bridged mode
+        4. Create a custom video mode by
 
-            `$ VBoxManage setextradata <your_vm_name> "CustomVideoMode1" "768x1280x32"`
+                $ VBoxManage setextradata <your_vm_name> "CustomVideoMode1" "768x1280x32"
 
-        6. Set the VM's network to bridged mode
-        7. Boot from the ISO in VirtualBox and (optional) install Android x86 on hard disk. To enable ADB connection, use
+        5. Boot from the ISO in VirtualBox and (optional) install Android x86 on hard disk.
+        6. If you installed Android x86 on hard disk, on your first boot, enter the debug mode by selecting the corresponding option in grub menu. Then open the `/mnt/grub/menu.lst` file and add `vga=normal UVESA_MODE=768x1280 DPI=320` to default kernel options. This is to enable vertical screen orientation. The value in `UVESA_MODE` should map what you specified in step 4.
+        6. Enable ADB connection using
 
-            `$ adb connect <vm_ip>:5555`
+                $ adb connect <vm_ip>:5555
 
-            One can get Android VM's ip by ALT+F7 and `ifconfig`.
+            One can get Android VM's ip by getting shell in VM using ALT+F7 and then using `ifconfig` command.
 
-        8. Enable `App Compatibility` in settings
-        9. Push the `houdini.sfs` in `libs` onto `/sdcard/` folder in the VM. Then in ADB shell, run
+        8. Enable `App Compatibility` in Android Settings, and enable ARM native code support by
 
-            `$ enable_nativebridges`
-
-            This should enable ARM native code support on x86 VM.
+                $ cd marshmallow_modifications
+                $ adb push libs/houdini.sfs /sdcard/
+                $ adb shell enable_nativebridges
 
 [prebuilt-imgs]: https://www.dropbox.com/s/yieoxl9i4chzg4x/ReDroid_img.tar.gz?dl=0
 [aosp]: https://source.android.com/
+[aosp_build]: https://source.android.com/source/requirements
 [andx86]: http://www.android-x86.org/
+[andx86_build]: http://www.android-x86.org/getsourcecode
 [andx86_vb]: http://www.android-x86.org/documents/virtualboxhowto
