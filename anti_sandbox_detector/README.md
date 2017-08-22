@@ -10,7 +10,7 @@ Utilities in `scripts` folder are called with corresponding config files in `con
 
 1. scripts/trace_collector.py
 
-    `$ python scripts/trace_collector.py -c configs/trace_collector_config.json`
+        $ python scripts/trace_collector.py -c configs/trace_collector_config.json
 
     This utility collects runtime traces on emulator and real device. Configured by `trace_collector_config.json`:
 
@@ -27,7 +27,7 @@ Utilities in `scripts` folder are called with corresponding config files in `con
 
 2. scripts/trace_comparator.py
 
-    `$ python scripts/trace_comparator.py -c configs/trace_comparator_config.json`
+        $ python scripts/trace_comparator.py -c configs/trace_comparator_config.json
 
     This utility compares runtime trace collected. Configured by `trace_comparator_config.json`:
 
