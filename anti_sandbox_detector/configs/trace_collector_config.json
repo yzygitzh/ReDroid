@@ -6,7 +6,7 @@
     "droidbot_args": {
         "-interval": 10,
         "-count": 5,
-        "-policy": "bfs",
+        "-policy": "dfs",
         "-no_shuffle": "",
         "-grant_perm": "",
         "-use_method_profiling": "full",

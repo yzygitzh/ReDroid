@@ -12,8 +12,8 @@ CONFIG_SLEEP_INTERVAL = 3
 # trace_collector_config.json default items
 TRACE_COLLECTOR_CONFIG_DROIDBOT_ARGS = {
     "-interval": CONFIG_INTERVAL,
-    "-count": 5,
-    "-policy": "bfs",
+    "-count": 2,
+    "-policy": "dfs",
     "-no_shuffle": "",
     "-grant_perm": "",
     "-use_method_profiling": "full",
@@ -35,7 +35,7 @@ DSM_GENERATOR_CONFIG_OUTPUT_DIR = os.path.join("ReDroid_dsm", "dsm")
 EMULATOR_DSM_PATH = "/data/system/ReDroid/dsm.json"
 
 # ReDroid apk path
-REDROID_APK_PATH = os.path.join("app_samples", "redroid.apk")
+REDROID_APK_PATH = os.path.join("app_samples", "ReDroid.apk")
 
 def run(config_json_path):
     """
@@ -148,7 +148,7 @@ def run(config_json_path):
     p.wait()
 
     # 6. install ReDroid app
-    p = subprocess.Popen(["adb", "-s", emulator_id, "install",
+    p = subprocess.Popen(["adb", "-s", emulator_id, "install", "-r", "-g",
                           os.path.join(redroid_path, REDROID_APK_PATH)])
 
 

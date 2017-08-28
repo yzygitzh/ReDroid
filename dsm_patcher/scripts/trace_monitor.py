@@ -29,10 +29,16 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
         package_name = [x for x in os.walk(app_droidbot_out_dir).next()[2]
                         if x.startswith("dumpsys")][0][len("dumpsys_package_"):-len(".txt")]
 
-        # get event sequences by droidbot_event.json
+        # get event sequences by events/event_*.json
         droidbot_events = []
-        with open("%s/droidbot_event.json" % app_droidbot_out_dir, "r") as event_file:
-            droidbot_events = json.load(event_file)[1:] # skip the first HOME event
+        event_paths = [os.path.join(app_droidbot_out_dir, "events", x) for x in
+                       os.walk(os.path.join(app_droidbot_out_dir, "events")).next()[2]
+                       if x.endswith(".json")]
+
+        # skip the first HOME KEY event
+        for event_path in event_paths[1:]:
+            with open(event_path, "r") as event_file:
+                droidbot_events.append(json.load(event_file)["event"])
 
         # get monitoring method list from trace_comparator_output_dir
         # tid: methods
