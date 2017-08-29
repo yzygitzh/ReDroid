@@ -14,10 +14,9 @@ TRACE_COLLECTOR_CONFIG_DROIDBOT_ARGS = {
     "-interval": CONFIG_INTERVAL,
     "-count": 2,
     "-policy": "dfs",
-    "-no_shuffle": "",
     "-grant_perm": "",
     "-use_method_profiling": "full",
-    "-dont_tear_down": ""
+    "-keep_env": ""
 }
 TRACE_COLLECTOR_CONFIG_OUTPUT_DIR = "ReDroid_apps_droidbot_out"
 
