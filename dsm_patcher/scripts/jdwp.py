@@ -389,8 +389,12 @@ class JDWPHelper():
             ret_type, ret_data = basic_parser[return_value[0]](return_value[1:])
             if ret_type == "string":
                 ident, code, str_data = self.StringReference_Value(ret_data)
-                str_len = struct.unpack(">I", str_data[:4])[0]
-                ret_data = struct.unpack(">%ds" % str_len, str_data[4:])[0].decode("utf8", "ignore").encode("utf8")
+                if not code:
+                    str_len = struct.unpack(">I", str_data[:4])[0]
+                    ret_data = struct.unpack(">%ds" % str_len, str_data[4:])[0].decode("utf8", "ignore").encode("utf8")
+                else: # string finding error, return null object
+                    ret_type = "object"
+                    ret_data = 0
             return ret_type, ret_data
 
     def update_class_method_info_by_class_names(self, class_name_list):

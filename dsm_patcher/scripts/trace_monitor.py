@@ -31,9 +31,9 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
 
         # get event sequences by events/event_*.json
         droidbot_events = []
-        event_paths = [os.path.join(app_droidbot_out_dir, "events", x) for x in
-                       os.walk(os.path.join(app_droidbot_out_dir, "events")).next()[2]
-                       if x.endswith(".json")]
+        event_paths = sorted([os.path.join(app_droidbot_out_dir, "events", x) for x in
+                              os.walk(os.path.join(app_droidbot_out_dir, "events")).next()[2]
+                              if x.endswith(".json")])
 
         # skip the first HOME KEY event
         for event_path in event_paths[1:]:
@@ -46,7 +46,7 @@ def monitor_func(device_id, apk_path_list, droidbot_out_dir,
         comparator_result_paths = ["%s/%s" % (trace_comparator_out_dir, x)
                                    for x in os.walk(trace_comparator_out_dir).next()[2]
                                    if x.startswith(apk_label)]
-        comparator_result_labels = [x.split("/")[-1][:-len(".json")] for x in comparator_result_paths]
+        comparator_result_labels = sorted([x.split("/")[-1][:-len(".json")] for x in comparator_result_paths])
         for comparator_result_path in comparator_result_paths:
             with open(comparator_result_path, "r") as comparator_result_file:
                 comparator_result = json.load(comparator_result_file)
