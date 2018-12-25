@@ -26,6 +26,7 @@ def java_shorty2full(short_sig):
                 class_end_idx += 1
             parsed_paras.append(fields[1][idx + 1:class_end_idx].replace("/", ".") + array_depth * "[]")
             idx = class_end_idx
+            array_depth = 0
         elif fields[1][idx] == "[":
             array_depth += 1
         elif fields[1][idx] != ")":
@@ -40,14 +41,15 @@ def java_full4dsm(shorty_sig):
 
 def get_monitoring_methods(trace_item_list):
     ret_list = []
-    method_filter = set(["Z", "B", "C", "S", "I", "J", "Ljava/lang/String;"])
+    # method_filter = set(["Z", "B", "C", "S", "I", "J", "Ljava/lang/String;"])
+    # method_filter = set(["Z", "Ljava/lang/String;"])
 
     for trace_item in trace_item_list:
         fields = trace_item.split()
         sig = fields[1]
         sig_end = sig[sig.rfind(")") + 1:]
-        if sig_end in method_filter:
-            ret_list.append(fields[0])
+        #if sig_end in method_filter:
+        ret_list.append(fields[0])
     return set(ret_list)
 
 def extract_method_classes(methods_list):
