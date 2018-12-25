@@ -1,0 +1,458 @@
+From 767ed519354ffcd594f8da5aef08dfd383c1d01d Mon Sep 17 00:00:00 2001
+From: Ziyue Yang <yzylivezh@hotmail.com>
+Date: Tue, 25 Dec 2018 15:57:52 +0800
+Subject: [PATCH] anti sandbox patch
+
+---
+ runtime/.vscode/settings.json                      |  5 ++
+ runtime/instrumentation.cc                         | 84 +++++++++++++++++++---
+ runtime/instrumentation.h                          | 15 ++++
+ runtime/interpreter/interpreter_common.cc          |  6 +-
+ runtime/interpreter/interpreter_goto_table_impl.cc | 18 +++--
+ runtime/interpreter/interpreter_switch_impl.cc     | 18 +++--
+ runtime/mirror/class-inl.h                         | 14 ++++
+ runtime/mirror/class.h                             |  2 +
+ runtime/runtime.cc                                 |  3 +
+ 9 files changed, 143 insertions(+), 22 deletions(-)
+ create mode 100644 runtime/.vscode/settings.json
+
+diff --git a/runtime/.vscode/settings.json b/runtime/.vscode/settings.json
+new file mode 100644
+index 000000000..c607f2d77
+--- /dev/null
++++ b/runtime/.vscode/settings.json
+@@ -0,0 +1,5 @@
++{
++    "files.associations": {
++        "sstream": "cpp"
++    }
++}
+\ No newline at end of file
+diff --git a/runtime/instrumentation.cc b/runtime/instrumentation.cc
+index d37ddcb88..4e2a5b792 100644
+--- a/runtime/instrumentation.cc
++++ b/runtime/instrumentation.cc
+@@ -16,6 +16,7 @@
+ 
+ #include "instrumentation.h"
+ 
++#include <fstream>
+ #include <sstream>
+ 
+ #include "arch/context.h"
+@@ -76,6 +77,8 @@ void Instrumentation::InstallStubsForClass(mirror::Class* klass) {
+   } else if (!klass->IsResolved()) {
+     // We need the class to be resolved to install/uninstall stubs. Otherwise its methods
+     // could not be initialized or linked with regards to class inheritance.
++  } else if (!IsClassMonitored(klass)) {
++    // Add stubs only for classes monitored by ReDroid.
+   } else {
+     for (size_t i = 0, e = klass->NumDirectMethods(); i < e; i++) {
+       InstallStubsForMethod(klass->GetDirectMethod(i, sizeof(void*)));
+@@ -115,6 +118,10 @@ static void UpdateEntrypoints(ArtMethod* method, const void* quick_code)
+ }
+ 
+ void Instrumentation::InstallStubsForMethod(ArtMethod* method) {
++  // Don't stub customized methods for ReDroid.
++  if (!IsMethodMonitored(method)) {
++    return;
++  }
+   if (method->IsAbstract() || method->IsProxyMethod()) {
+     // Do not change stubs for these methods.
+     return;
+@@ -166,12 +173,14 @@ void Instrumentation::InstallStubsForMethod(ArtMethod* method) {
+ static void InstrumentationInstallStack(Thread* thread, void* arg)
+     SHARED_LOCKS_REQUIRED(Locks::mutator_lock_) {
+   struct InstallStackVisitor FINAL : public StackVisitor {
+-    InstallStackVisitor(Thread* thread_in, Context* context, uintptr_t instrumentation_exit_pc)
++    InstallStackVisitor(Thread* thread_in, Context* context, uintptr_t instrumentation_exit_pc,
++                        Instrumentation *instrumentation)
+         : StackVisitor(thread_in, context, kInstrumentationStackWalk),
+           instrumentation_stack_(thread_in->GetInstrumentationStack()),
+           instrumentation_exit_pc_(instrumentation_exit_pc),
+           reached_existing_instrumentation_frames_(false), instrumentation_stack_depth_(0),
+-          last_return_pc_(0) {
++          last_return_pc_(0),
++          instrumentation_(instrumentation) {
+     }
+ 
+     bool VisitFrame() OVERRIDE SHARED_LOCKS_REQUIRED(Locks::mutator_lock_) {
+@@ -184,6 +193,10 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
+         return true;  // Ignore upcalls.
+       }
+       if (GetCurrentQuickFrame() == nullptr) {
++        // Push shadow stack only for methods monitored by ReDroid.
++        if (!instrumentation_->IsMethodMonitored(m)) {
++          return true;
++        }
+         bool interpreter_frame = true;
+         InstrumentationStackFrame instrumentation_frame(GetThisObject(), m, 0, GetFrameId(),
+                                                         interpreter_frame);
+@@ -238,6 +251,13 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
+       } else {
+         CHECK_NE(return_pc, 0U);
+         CHECK(!reached_existing_instrumentation_frames_);
++
++        // Do not insert instrumentation frame for customized methods in ReDroid.
++        if (!instrumentation_->IsMethodMonitored(m)) {
++          last_return_pc_ = return_pc;
++          return true;
++        }
++
+         InstrumentationStackFrame instrumentation_frame(GetThisObject(), m, return_pc, GetFrameId(),
+                                                         false);
+         if (kVerboseInstrumentation) {
+@@ -268,6 +288,7 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
+     bool reached_existing_instrumentation_frames_;
+     size_t instrumentation_stack_depth_;
+     uintptr_t last_return_pc_;
++    Instrumentation* const instrumentation_;
+   };
+   if (kVerboseInstrumentation) {
+     std::string thread_name;
+@@ -278,7 +299,7 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
+   Instrumentation* instrumentation = reinterpret_cast<Instrumentation*>(arg);
+   std::unique_ptr<Context> context(Context::Create());
+   uintptr_t instrumentation_exit_pc = reinterpret_cast<uintptr_t>(GetQuickInstrumentationExitPc());
+-  InstallStackVisitor visitor(thread, context.get(), instrumentation_exit_pc);
++  InstallStackVisitor visitor(thread, context.get(), instrumentation_exit_pc, instrumentation);
+   visitor.WalkStack(true);
+   CHECK_EQ(visitor.dex_pcs_.size(), thread->GetInstrumentationStack()->size());
+ 
+@@ -289,13 +310,17 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
+     for (auto isi = thread->GetInstrumentationStack()->rbegin(),
+         end = thread->GetInstrumentationStack()->rend(); isi != end; ++isi) {
+       while (ssi != visitor.shadow_stack_.rend() && (*ssi).frame_id_ < (*isi).frame_id_) {
+-        instrumentation->MethodEnterEvent(thread, (*ssi).this_object_, (*ssi).method_, 0);
++        if (instrumentation->IsMethodMonitored((*ssi).method_)) {
++          instrumentation->MethodEnterEvent(thread, (*ssi).this_object_, (*ssi).method_, 0);
++        }
+         ++ssi;
+       }
+       uint32_t dex_pc = visitor.dex_pcs_.back();
+       visitor.dex_pcs_.pop_back();
+       if (!isi->interpreter_entry_) {
+-        instrumentation->MethodEnterEvent(thread, (*isi).this_object_, (*isi).method_, dex_pc);
++        if (instrumentation->IsMethodMonitored((*isi).method_)) {
++          instrumentation->MethodEnterEvent(thread, (*isi).this_object_, (*isi).method_, dex_pc);
++        }
+       }
+     }
+   }
+@@ -335,6 +360,7 @@ static void InstrumentationRestoreStack(Thread* thread, void* arg)
+       }
+       bool removed_stub = false;
+       // TODO: make this search more efficient?
++      // In ReDroid some methods don't have exit stub, and search fails.
+       const size_t frameId = GetFrameId();
+       for (const InstrumentationStackFrame& instrumentation_frame : *instrumentation_stack_) {
+         if (instrumentation_frame.frame_id_ == frameId) {
+@@ -350,8 +376,10 @@ static void InstrumentationRestoreStack(Thread* thread, void* arg)
+           if (instrumentation_->ShouldNotifyMethodEnterExitEvents()) {
+             // Create the method exit events. As the methods didn't really exit the result is 0.
+             // We only do this if no debugger is attached to prevent from posting events twice.
+-            instrumentation_->MethodExitEvent(thread_, instrumentation_frame.this_object_, m,
+-                                              GetDexPc(), JValue());
++            if (instrumentation_->IsMethodMonitored(m)) {
++              instrumentation_->MethodExitEvent(thread_, instrumentation_frame.this_object_, m,
++                                                GetDexPc(), JValue());
++            }
+           }
+           frames_removed_++;
+           removed_stub = true;
+@@ -714,6 +742,45 @@ bool Instrumentation::IsDeoptimizedMethodsEmpty() const {
+   return deoptimized_methods_.empty();
+ }
+ 
++inline bool Instrumentation::IsMethodMonitored(ArtMethod *method) const {
++  if (method == nullptr) return false;
++  if (!IsClassMonitored(method->GetDeclaringClass())) return false;
++
++  std::string class_str(method->GetDeclaringClass()->GetFilterId());
++  std::string method_str(method->GetName());
++
++  return instrumentation_filters_.at(class_str).find(method_str) !=
++         instrumentation_filters_.at(class_str).end();
++}
++
++inline bool Instrumentation::IsClassMonitored(mirror::Class* klass) const {
++  if (klass == nullptr) return false;
++
++  std::string class_str(klass->GetFilterId());
++
++  return instrumentation_filters_.find(class_str) !=
++         instrumentation_filters_.end();
++}
++
++void Instrumentation::LoadInstrumentationFilters() {
++  std::ifstream fin("/data/local/tmp/redroid_filters");
++  std::string filter_line;
++  while (fin >> filter_line) {
++    std::string class_str("L"), method_str;
++    for (std::string::iterator itr = filter_line.begin();
++         itr != filter_line.end(); ++itr) {
++      if (*itr != '.') {
++        method_str += *itr;
++      } else {
++        class_str += method_str + '/';
++        method_str = "";
++      }
++    }
++    *class_str.rbegin() = ';';
++    instrumentation_filters_[class_str].insert(method_str);
++  }
++}
++
+ void Instrumentation::Deoptimize(ArtMethod* method) {
+   CHECK(!method->IsNative());
+   CHECK(!method->IsProxyMethod());
+@@ -1001,7 +1068,8 @@ TwoWordReturn Instrumentation::PopInstrumentationStackFrame(Thread* self, uintpt
+   //       return_pc.
+   uint32_t dex_pc = DexFile::kDexNoIndex;
+   mirror::Object* this_object = instrumentation_frame.this_object_;
+-  if (!instrumentation_frame.interpreter_entry_) {
++  if (!instrumentation_frame.interpreter_entry_ &&
++      IsMethodMonitored(instrumentation_frame.method_)) {
+     MethodExitEvent(self, this_object, instrumentation_frame.method_, dex_pc, return_value);
+   }
+ 
+diff --git a/runtime/instrumentation.h b/runtime/instrumentation.h
+index db8e9c250..822551903 100644
+--- a/runtime/instrumentation.h
++++ b/runtime/instrumentation.h
+@@ -19,6 +19,7 @@
+ 
+ #include <stdint.h>
+ #include <list>
++#include <unordered_map>
+ #include <unordered_set>
+ 
+ #include "arch/instruction_set.h"
+@@ -359,6 +360,17 @@ class Instrumentation {
+   void InstallStubsForMethod(ArtMethod* method)
+       SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
+ 
++  // whether a method is monitored by ReDroid
++  bool IsMethodMonitored(ArtMethod* method) const
++      SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
++
++  // whether a class is monitored by ReDroid
++  bool IsClassMonitored(mirror::Class* klass) const
++      SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
++
++  // instrumentation filters for ReDroid
++  void LoadInstrumentationFilters();
++
+  private:
+   InstrumentationLevel GetCurrentInstrumentationLevel() const;
+ 
+@@ -493,6 +505,9 @@ class Instrumentation {
+   size_t quick_alloc_entry_points_instrumentation_counter_
+       GUARDED_BY(Locks::instrument_entrypoints_lock_);
+ 
++  // String-based trie filter for ReDroid
++  std::unordered_map<std::string, std::unordered_set<std::string>> instrumentation_filters_;
++
+   friend class InstrumentationTest;  // For GetCurrentInstrumentationLevel and ConfigureStubs.
+ 
+   DISALLOW_COPY_AND_ASSIGN(Instrumentation);
+diff --git a/runtime/interpreter/interpreter_common.cc b/runtime/interpreter/interpreter_common.cc
+index a245890ad..d402ea323 100644
+--- a/runtime/interpreter/interpreter_common.cc
++++ b/runtime/interpreter/interpreter_common.cc
+@@ -429,8 +429,10 @@ uint32_t FindNextInstructionFollowingException(
+   if (found_dex_pc == DexFile::kDexNoIndex) {
+     // Exception is not caught by the current method. We will unwind to the
+     // caller. Notify any instrumentation listener.
+-    instrumentation->MethodUnwindEvent(self, shadow_frame.GetThisObject(),
+-                                       shadow_frame.GetMethod(), dex_pc);
++    if (UNLIKELY(instrumentation->IsMethodMonitored(shadow_frame.GetMethod()))) {
++      instrumentation->MethodUnwindEvent(self, shadow_frame.GetThisObject(),
++                                         shadow_frame.GetMethod(), dex_pc);
++    }
+   } else {
+     // Exception is caught in the current method. We will jump to the found_dex_pc.
+     if (clear_exception) {
+diff --git a/runtime/interpreter/interpreter_goto_table_impl.cc b/runtime/interpreter/interpreter_goto_table_impl.cc
+index 86027c542..b56e11036 100644
+--- a/runtime/interpreter/interpreter_goto_table_impl.cc
++++ b/runtime/interpreter/interpreter_goto_table_impl.cc
+@@ -162,7 +162,8 @@ JValue ExecuteGotoImpl(Thread* self, const DexFile::CodeItem* code_item, ShadowF
+       self->AssertNoPendingException();
+     }
+     instrumentation::Instrumentation* instrumentation = Runtime::Current()->GetInstrumentation();
+-    if (UNLIKELY(instrumentation->HasMethodEntryListeners())) {
++    if (UNLIKELY(instrumentation->HasMethodEntryListeners() &&
++                 instrumentation->IsMethodMonitored(shadow_frame.GetMethod()))) {
+       instrumentation->MethodEnterEvent(self, shadow_frame.GetThisObject(code_item->ins_size_),
+                                         shadow_frame.GetMethod(), 0);
+     }
+@@ -258,7 +259,8 @@ JValue ExecuteGotoImpl(Thread* self, const DexFile::CodeItem* code_item, ShadowF
+     JValue result;
+     self->AllowThreadSuspension();
+     instrumentation::Instrumentation* instrumentation = Runtime::Current()->GetInstrumentation();
+-    if (UNLIKELY(instrumentation->HasMethodExitListeners())) {
++    if (UNLIKELY(instrumentation->HasMethodExitListeners() &&
++                 instrumentation->IsMethodMonitored(shadow_frame.GetMethod()))) {
+       instrumentation->MethodExitEvent(self, shadow_frame.GetThisObject(code_item->ins_size_),
+                                        shadow_frame.GetMethod(), dex_pc,
+                                        result);
+@@ -272,7 +274,8 @@ JValue ExecuteGotoImpl(Thread* self, const DexFile::CodeItem* code_item, ShadowF
+     JValue result;
+     self->AllowThreadSuspension();
+     instrumentation::Instrumentation* instrumentation = Runtime::Current()->GetInstrumentation();
+-    if (UNLIKELY(instrumentation->HasMethodExitListeners())) {
++    if (UNLIKELY(instrumentation->HasMethodExitListeners() &&
++                 instrumentation->IsMethodMonitored(shadow_frame.GetMethod()))) {
+       instrumentation->MethodExitEvent(self, shadow_frame.GetThisObject(code_item->ins_size_),
+                                        shadow_frame.GetMethod(), dex_pc,
+                                        result);
+@@ -287,7 +290,8 @@ JValue ExecuteGotoImpl(Thread* self, const DexFile::CodeItem* code_item, ShadowF
+     result.SetI(shadow_frame.GetVReg(inst->VRegA_11x(inst_data)));
+     self->AllowThreadSuspension();
+     instrumentation::Instrumentation* instrumentation = Runtime::Current()->GetInstrumentation();
+-    if (UNLIKELY(instrumentation->HasMethodExitListeners())) {
++    if (UNLIKELY(instrumentation->HasMethodExitListeners() &&
++                 instrumentation->IsMethodMonitored(shadow_frame.GetMethod()))) {
+       instrumentation->MethodExitEvent(self, shadow_frame.GetThisObject(code_item->ins_size_),
+                                        shadow_frame.GetMethod(), dex_pc,
+                                        result);
+@@ -301,7 +305,8 @@ JValue ExecuteGotoImpl(Thread* self, const DexFile::CodeItem* code_item, ShadowF
+     result.SetJ(shadow_frame.GetVRegLong(inst->VRegA_11x(inst_data)));
+     self->AllowThreadSuspension();
+     instrumentation::Instrumentation* instrumentation = Runtime::Current()->GetInstrumentation();
+-    if (UNLIKELY(instrumentation->HasMethodExitListeners())) {
++    if (UNLIKELY(instrumentation->HasMethodExitListeners() &&
++                 instrumentation->IsMethodMonitored(shadow_frame.GetMethod()))) {
+       instrumentation->MethodExitEvent(self, shadow_frame.GetThisObject(code_item->ins_size_),
+                                        shadow_frame.GetMethod(), dex_pc,
+                                        result);
+@@ -334,7 +339,8 @@ JValue ExecuteGotoImpl(Thread* self, const DexFile::CodeItem* code_item, ShadowF
+     }
+     result.SetL(obj_result);
+     instrumentation::Instrumentation* instrumentation = Runtime::Current()->GetInstrumentation();
+-    if (UNLIKELY(instrumentation->HasMethodExitListeners())) {
++    if (UNLIKELY(instrumentation->HasMethodExitListeners() &&
++                 instrumentation->IsMethodMonitored(shadow_frame.GetMethod()))) {
+       instrumentation->MethodExitEvent(self, shadow_frame.GetThisObject(code_item->ins_size_),
+                                        shadow_frame.GetMethod(), dex_pc,
+                                        result);
+diff --git a/runtime/interpreter/interpreter_switch_impl.cc b/runtime/interpreter/interpreter_switch_impl.cc
+index dd7aa4036..c52d65982 100644
+--- a/runtime/interpreter/interpreter_switch_impl.cc
++++ b/runtime/interpreter/interpreter_switch_impl.cc
+@@ -69,7 +69,8 @@ JValue ExecuteSwitchImpl(Thread* self, const DexFile::CodeItem* code_item,
+     if (kIsDebugBuild) {
+         self->AssertNoPendingException();
+     }
+-    if (UNLIKELY(instrumentation->HasMethodEntryListeners())) {
++    if (UNLIKELY(instrumentation->HasMethodEntryListeners()) &&
++                 instrumentation->IsMethodMonitored(shadow_frame.GetMethod())) {
+       instrumentation->MethodEnterEvent(self, shadow_frame.GetThisObject(code_item->ins_size_),
+                                         shadow_frame.GetMethod(), 0);
+     }
+@@ -169,7 +170,8 @@ JValue ExecuteSwitchImpl(Thread* self, const DexFile::CodeItem* code_item,
+         PREAMBLE();
+         JValue result;
+         self->AllowThreadSuspension();
+-        if (UNLIKELY(instrumentation->HasMethodExitListeners())) {
++        if (UNLIKELY(instrumentation->HasMethodExitListeners() &&
++                     instrumentation->IsMethodMonitored(shadow_frame.GetMethod()))) {
+           instrumentation->MethodExitEvent(self, shadow_frame.GetThisObject(code_item->ins_size_),
+                                            shadow_frame.GetMethod(), inst->GetDexPc(insns),
+                                            result);
+@@ -181,7 +183,8 @@ JValue ExecuteSwitchImpl(Thread* self, const DexFile::CodeItem* code_item,
+         QuasiAtomic::ThreadFenceForConstructor();
+         JValue result;
+         self->AllowThreadSuspension();
+-        if (UNLIKELY(instrumentation->HasMethodExitListeners())) {
++        if (UNLIKELY(instrumentation->HasMethodExitListeners() &&
++                     instrumentation->IsMethodMonitored(shadow_frame.GetMethod()))) {
+           instrumentation->MethodExitEvent(self, shadow_frame.GetThisObject(code_item->ins_size_),
+                                            shadow_frame.GetMethod(), inst->GetDexPc(insns),
+                                            result);
+@@ -194,7 +197,8 @@ JValue ExecuteSwitchImpl(Thread* self, const DexFile::CodeItem* code_item,
+         result.SetJ(0);
+         result.SetI(shadow_frame.GetVReg(inst->VRegA_11x(inst_data)));
+         self->AllowThreadSuspension();
+-        if (UNLIKELY(instrumentation->HasMethodExitListeners())) {
++        if (UNLIKELY(instrumentation->HasMethodExitListeners() &&
++                     instrumentation->IsMethodMonitored(shadow_frame.GetMethod()))) {
+           instrumentation->MethodExitEvent(self, shadow_frame.GetThisObject(code_item->ins_size_),
+                                            shadow_frame.GetMethod(), inst->GetDexPc(insns),
+                                            result);
+@@ -206,7 +210,8 @@ JValue ExecuteSwitchImpl(Thread* self, const DexFile::CodeItem* code_item,
+         JValue result;
+         result.SetJ(shadow_frame.GetVRegLong(inst->VRegA_11x(inst_data)));
+         self->AllowThreadSuspension();
+-        if (UNLIKELY(instrumentation->HasMethodExitListeners())) {
++        if (UNLIKELY(instrumentation->HasMethodExitListeners() &&
++                     instrumentation->IsMethodMonitored(shadow_frame.GetMethod()))) {
+           instrumentation->MethodExitEvent(self, shadow_frame.GetThisObject(code_item->ins_size_),
+                                            shadow_frame.GetMethod(), inst->GetDexPc(insns),
+                                            result);
+@@ -238,7 +243,8 @@ JValue ExecuteSwitchImpl(Thread* self, const DexFile::CodeItem* code_item,
+           }
+         }
+         result.SetL(obj_result);
+-        if (UNLIKELY(instrumentation->HasMethodExitListeners())) {
++        if (UNLIKELY(instrumentation->HasMethodExitListeners() &&
++                     instrumentation->IsMethodMonitored(shadow_frame.GetMethod()))) {
+           instrumentation->MethodExitEvent(self, shadow_frame.GetThisObject(code_item->ins_size_),
+                                            shadow_frame.GetMethod(), inst->GetDexPc(insns),
+                                            result);
+diff --git a/runtime/mirror/class-inl.h b/runtime/mirror/class-inl.h
+index 0538f4baa..7f41b473c 100644
+--- a/runtime/mirror/class-inl.h
++++ b/runtime/mirror/class-inl.h
+@@ -710,6 +710,20 @@ inline bool Class::DescriptorEquals(const char* match) {
+   }
+ }
+ 
++inline const char* Class::GetFilterId() {
++  if (IsArrayClass()) {
++    return GetComponentType()->GetFilterId();
++  } else if (IsPrimitive()) {
++    return Primitive::Descriptor(GetPrimitiveType());
++  } else if (IsProxyClass()) {
++    return Runtime::Current()->GetClassLinker()->GetDescriptorForProxy(this).c_str();
++  } else {
++    const DexFile& dex_file = GetDexFile();
++    const DexFile::TypeId& type_id = dex_file.GetTypeId(GetClassDef()->class_idx_);
++    return dex_file.GetTypeDescriptor(type_id);
++  }
++}
++
+ inline void Class::AssertInitializedOrInitializingInThread(Thread* self) {
+   if (kIsDebugBuild && !IsInitialized()) {
+     CHECK(IsInitializing()) << PrettyClass(this) << " is not initializing: " << GetStatus();
+diff --git a/runtime/mirror/class.h b/runtime/mirror/class.h
+index 045390617..e9be196bf 100644
+--- a/runtime/mirror/class.h
++++ b/runtime/mirror/class.h
+@@ -1063,6 +1063,8 @@ class MANAGED Class FINAL : public Object {
+   // this to avoid memory allocation in the common case.
+   const char* GetDescriptor(std::string* storage) SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
+ 
++  const char* GetFilterId() SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
++
+   const char* GetArrayDescriptor(std::string* storage) SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
+ 
+   bool DescriptorEquals(const char* match) SHARED_LOCKS_REQUIRED(Locks::mutator_lock_);
+diff --git a/runtime/runtime.cc b/runtime/runtime.cc
+index 93f66ec30..6c6e7d5ac 100644
+--- a/runtime/runtime.cc
++++ b/runtime/runtime.cc
+@@ -662,6 +662,9 @@ void Runtime::DidForkFromZygote(JNIEnv* env, NativeBridgeAction action, const ch
+   // Start the JDWP thread. If the command-line debugger flags specified "suspend=y",
+   // this will pause the runtime, so we probably want this to come last.
+   Dbg::StartJdwp();
++
++  // Call LoadInstrumentationFilters for ReDroid
++  GetInstrumentation()->LoadInstrumentationFilters();
+ }
+ 
+ void Runtime::StartSignalCatcher() {
+-- 
+2.14.1
+

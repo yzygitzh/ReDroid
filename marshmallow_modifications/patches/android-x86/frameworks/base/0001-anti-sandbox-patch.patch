@@ -1,15 +1,16 @@
-From 358b439259025fdd032e3b4a1607e1da76c1803f Mon Sep 17 00:00:00 2001
+From 7e180232117d977dcf92322b66960becffa1801f Mon Sep 17 00:00:00 2001
 From: Ziyue Yang <yzylivezh@hotmail.com>
-Date: Tue, 25 Dec 2018 14:55:07 +0800
+Date: Tue, 25 Dec 2018 15:57:52 +0800
 Subject: [PATCH] anti sandbox patch
 
 ---
- core/java/android/app/ActivityThread.java                     |  4 ++--
- core/java/android/app/Instrumentation.java                    |  2 +-
- core/java/android/os/Debug.java                               | 11 ++++++++---
- .../core/java/com/android/server/wm/WindowManagerService.java |  2 +-
- test-runner/src/android/test/TestRunner.java                  |  2 +-
- 5 files changed, 13 insertions(+), 8 deletions(-)
+ core/java/android/app/ActivityThread.java                |  4 ++--
+ core/java/android/app/Instrumentation.java               |  2 +-
+ core/java/android/content/ContentProviderNative.java     | 16 +++++++++++++++-
+ core/java/android/os/Debug.java                          | 11 ++++++++---
+ .../java/com/android/server/wm/WindowManagerService.java |  2 +-
+ test-runner/src/android/test/TestRunner.java             |  2 +-
+ 6 files changed, 28 insertions(+), 9 deletions(-)
 
 diff --git a/core/java/android/app/ActivityThread.java b/core/java/android/app/ActivityThread.java
 index 537b00aca5d..0d6ec971d52 100644
@@ -46,6 +47,117 @@ index 69b8b9510b3..548b9a5b611 100644
          }
      }
  
+diff --git a/core/java/android/content/ContentProviderNative.java b/core/java/android/content/ContentProviderNative.java
+index 4769bd02a5d..b127c23cee4 100644
+--- a/core/java/android/content/ContentProviderNative.java
++++ b/core/java/android/content/ContentProviderNative.java
+@@ -32,6 +32,7 @@ import android.os.Parcel;
+ import android.os.ParcelFileDescriptor;
+ import android.os.Parcelable;
+ import android.os.RemoteException;
++import android.util.Log;
+ 
+ import java.io.FileNotFoundException;
+ import java.util.ArrayList;
+@@ -373,6 +374,8 @@ abstract public class ContentProviderNative extends Binder implements IContentPr
+ 
+ final class ContentProviderProxy implements IContentProvider
+ {
++    private final static String TAG = "ContentProviderProxy";
++
+     public ContentProviderProxy(IBinder remote)
+     {
+         mRemote = remote;
+@@ -386,6 +389,7 @@ final class ContentProviderProxy implements IContentProvider
+     public Cursor query(String callingPkg, Uri url, String[] projection, String selection,
+             String[] selectionArgs, String sortOrder, ICancellationSignal cancellationSignal)
+                     throws RemoteException {
++        Log.i(TAG, "query: " + callingPkg + " " + url);
+         BulkCursorToCursorAdaptor adaptor = new BulkCursorToCursorAdaptor();
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+@@ -462,6 +466,7 @@ final class ContentProviderProxy implements IContentProvider
+ 
+     public Uri insert(String callingPkg, Uri url, ContentValues values) throws RemoteException
+     {
++        Log.i(TAG, "insert: " + callingPkg + " " + url);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
+@@ -483,6 +488,7 @@ final class ContentProviderProxy implements IContentProvider
+     }
+ 
+     public int bulkInsert(String callingPkg, Uri url, ContentValues[] values) throws RemoteException {
++        Log.i(TAG, "bulkInsert: " + callingPkg + " " + url);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
+@@ -503,7 +509,7 @@ final class ContentProviderProxy implements IContentProvider
+         }
+     }
+ 
+-    public ContentProviderResult[] applyBatch(String callingPkg, 
++    public ContentProviderResult[] applyBatch(String callingPkg,
+             ArrayList<ContentProviderOperation> operations)
+                     throws RemoteException, OperationApplicationException {
+         Parcel data = Parcel.obtain();
+@@ -513,6 +519,8 @@ final class ContentProviderProxy implements IContentProvider
+             data.writeString(callingPkg);
+             data.writeInt(operations.size());
+             for (ContentProviderOperation operation : operations) {
++                Log.i(TAG, "applyBatch_" + operation.getType() + ": " +
++                      callingPkg + " " + operation.getUri());
+                 operation.writeToParcel(data, 0);
+             }
+             mRemote.transact(IContentProvider.APPLY_BATCH_TRANSACTION, data, reply, 0);
+@@ -529,6 +537,7 @@ final class ContentProviderProxy implements IContentProvider
+ 
+     public int delete(String callingPkg, Uri url, String selection, String[] selectionArgs)
+             throws RemoteException {
++        Log.i(TAG, "delete: " + callingPkg + " " + url);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
+@@ -552,6 +561,7 @@ final class ContentProviderProxy implements IContentProvider
+ 
+     public int update(String callingPkg, Uri url, ContentValues values, String selection,
+             String[] selectionArgs) throws RemoteException {
++        Log.i(TAG, "update: " + callingPkg + " " + url);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
+@@ -578,6 +588,7 @@ final class ContentProviderProxy implements IContentProvider
+     public ParcelFileDescriptor openFile(
+             String callingPkg, Uri url, String mode, ICancellationSignal signal, IBinder token)
+             throws RemoteException, FileNotFoundException {
++        Log.i(TAG, "openFile_" + mode + ": " + callingPkg + " " + url);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
+@@ -606,6 +617,7 @@ final class ContentProviderProxy implements IContentProvider
+     public AssetFileDescriptor openAssetFile(
+             String callingPkg, Uri url, String mode, ICancellationSignal signal)
+             throws RemoteException, FileNotFoundException {
++        Log.i(TAG, "openAssetFile_" + mode + ": " + callingPkg + " " + url);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
+@@ -631,6 +643,7 @@ final class ContentProviderProxy implements IContentProvider
+ 
+     public Bundle call(String callingPkg, String method, String request, Bundle args)
+             throws RemoteException {
++        Log.i(TAG, "call_" + method + "_" + request + ": " + callingPkg);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
+@@ -676,6 +689,7 @@ final class ContentProviderProxy implements IContentProvider
+     @Override
+     public AssetFileDescriptor openTypedAssetFile(String callingPkg, Uri url, String mimeType,
+             Bundle opts, ICancellationSignal signal) throws RemoteException, FileNotFoundException {
++        Log.i(TAG, "openTypedAssetFile_" + mimeType + ": " + callingPkg + " " + url);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
 diff --git a/core/java/android/os/Debug.java b/core/java/android/os/Debug.java
 index fdd34f586e8..db349927a1c 100644
 --- a/core/java/android/os/Debug.java
