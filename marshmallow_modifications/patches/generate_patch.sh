@@ -12,6 +12,7 @@ AOSP_PROJECTS=(
     "build/"
     "frameworks/base/"
     "system/core/"
+    "art/"
 )
 # AOSP branch name
 AOSP_OLD_BRANCH="android-6.0.1_r77"
