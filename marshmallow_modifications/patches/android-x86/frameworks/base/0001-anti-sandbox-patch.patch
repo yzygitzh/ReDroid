@@ -1,6 +1,6 @@
-From 0a9218d5bb8dcaf0b0b5bd2325671e3aad3f20c0 Mon Sep 17 00:00:00 2001
+From 358b439259025fdd032e3b4a1607e1da76c1803f Mon Sep 17 00:00:00 2001
 From: Ziyue Yang <yzylivezh@hotmail.com>
-Date: Thu, 27 Jul 2017 12:33:16 +0800
+Date: Tue, 25 Dec 2018 14:55:07 +0800
 Subject: [PATCH] anti sandbox patch
 
 ---
@@ -117,5 +117,5 @@ index 012df350102..a8494f922af 100644
  
      public void finishProfiling() {
 -- 
-2.13.2
+2.14.1
 

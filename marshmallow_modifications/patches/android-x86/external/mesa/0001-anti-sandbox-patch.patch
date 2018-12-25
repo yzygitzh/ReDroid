@@ -1,6 +1,6 @@
-From 1cfb62e7fde0c26aa001eba79df48d7772a85acc Mon Sep 17 00:00:00 2001
+From 1806a9b9431da9f47cdd09c8cb1f2eeabefe4cf7 Mon Sep 17 00:00:00 2001
 From: Ziyue Yang <yzylivezh@hotmail.com>
-Date: Thu, 27 Jul 2017 12:33:12 +0800
+Date: Tue, 25 Dec 2018 14:55:06 +0800
 Subject: [PATCH] anti sandbox patch
 
 ---
@@ -22,5 +22,5 @@ index d63e71da92..47f1ac78a9 100644
  LOCAL_STATIC_LIBRARIES := \
  	libmesa_loader
 -- 
-2.13.2
+2.14.1
 
