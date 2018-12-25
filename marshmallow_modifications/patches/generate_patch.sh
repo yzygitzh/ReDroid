@@ -29,6 +29,7 @@ ANDX86_PROJECTS=(
     "device/generic/common/"
     "external/mesa/"
     "frameworks/base/"
+    "art/"
 )
 # Android-x86 branch name
 ANDX86_OLD_BRANCH="remotes/m/android-x86-6.0-r3"
