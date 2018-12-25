@@ -23,6 +23,7 @@ def trace_str_to_class_method(trace_str):
         trace_idx += 1
     return trace_str[trace_idx:]
 
+
 def clean_trace(trace_list, ex_package_set):
     # Clean irrelevant traces like java.lang, android.view
     # return trace_list, origin_idx_list
@@ -186,10 +187,12 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path,
             # method calls before the divering custom method
             if trace_similarity_info["real_trace"] is not None:
                 real_api_list = real_device_thread["trace"][:real_idx[trace_idx]]
+                # TODO: provide selected apis for trace monitor
                 trace_similarity_info["real_api"] = sorted(list(set([trace_str_to_class_method(x) for x in real_api_list])))
 
             if trace_similarity_info["emu_trace"] is not None:
                 emu_api_list = emulator_thread["trace"][:emu_idx[trace_idx]]
+                # TODO: provide selected apis for trace monitor
                 trace_similarity_info["emu_api"] = sorted(list(set([trace_str_to_class_method(x) for x in emu_api_list])))
 
             trace_similarity_list.append(trace_similarity_info)
@@ -200,6 +203,7 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path,
         unmatched_threads["real_device"].append({
             "id": tid,
             "name": tname,
+            # TODO: provide selected apis for trace monitor
             "api": sorted(list(set([trace_str_to_class_method(x)
                                     for x in real_device_trace_obj["thread_info"][tid]["trace"]])))
         })
@@ -208,6 +212,7 @@ def compare_trace(real_device_trace_path, emulator_trace_path, output_file_path,
         unmatched_threads["emulator"].append({
             "id": tid,
             "name": tname,
+            # TODO: provide selected apis for trace monitor
             "api": sorted(list(set([trace_str_to_class_method(x)
                                     for x in emulator_trace_obj["thread_info"][tid]["trace"]])))
         })
