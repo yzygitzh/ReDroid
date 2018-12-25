@@ -1,6 +1,6 @@
-From 83b47c999c96841aa8f0cf0b136ebbf752e670e4 Mon Sep 17 00:00:00 2001
+From e25fdb7a6a23e4f11ab81b248ef77d9fb3548227 Mon Sep 17 00:00:00 2001
 From: Ziyue Yang <yzylivezh@hotmail.com>
-Date: Thu, 27 Jul 2017 12:33:10 +0800
+Date: Tue, 25 Dec 2018 14:55:06 +0800
 Subject: [PATCH] anti sandbox patch
 
 ---
@@ -8,7 +8,7 @@ Subject: [PATCH] anti sandbox patch
  1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/adb/Android.mk b/adb/Android.mk
-index d4adbfb6a..7e1c24103 100644
+index d4adbfb..7e1c241 100644
 --- a/adb/Android.mk
 +++ b/adb/Android.mk
 @@ -235,7 +235,8 @@ LOCAL_CFLAGS := \
@@ -22,5 +22,5 @@ index d4adbfb6a..7e1c24103 100644
  ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
  LOCAL_CFLAGS += -DALLOW_ADBD_DISABLE_VERITY=1
 -- 
-2.13.2
+2.14.1
 

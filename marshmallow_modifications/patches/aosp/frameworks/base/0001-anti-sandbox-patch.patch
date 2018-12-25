@@ -1,18 +1,19 @@
-From 95f3f02d648766f71aa67e466541e3e84c4e8ae5 Mon Sep 17 00:00:00 2001
+From 79e0b0e3af0b8c22ab25964fbaf0f2977a77efeb Mon Sep 17 00:00:00 2001
 From: Ziyue Yang <yzylivezh@hotmail.com>
-Date: Thu, 27 Jul 2017 12:33:09 +0800
+Date: Tue, 25 Dec 2018 14:55:05 +0800
 Subject: [PATCH] anti sandbox patch
 
 ---
- core/java/android/app/ActivityThread.java                     |  4 ++--
- core/java/android/app/Instrumentation.java                    |  2 +-
- core/java/android/os/Debug.java                               | 11 ++++++++---
- .../core/java/com/android/server/wm/WindowManagerService.java |  2 +-
- test-runner/src/android/test/TestRunner.java                  |  2 +-
- 5 files changed, 13 insertions(+), 8 deletions(-)
+ core/java/android/app/ActivityThread.java                |  4 ++--
+ core/java/android/app/Instrumentation.java               |  2 +-
+ core/java/android/content/ContentProviderNative.java     | 16 +++++++++++++++-
+ core/java/android/os/Debug.java                          | 11 ++++++++---
+ .../java/com/android/server/wm/WindowManagerService.java |  2 +-
+ test-runner/src/android/test/TestRunner.java             |  2 +-
+ 6 files changed, 28 insertions(+), 9 deletions(-)
 
 diff --git a/core/java/android/app/ActivityThread.java b/core/java/android/app/ActivityThread.java
-index da21eaffa95..7e506b64dd1 100644
+index da21eaff..7e506b64 100644
 --- a/core/java/android/app/ActivityThread.java
 +++ b/core/java/android/app/ActivityThread.java
 @@ -495,7 +495,7 @@ public final class ActivityThread {
@@ -34,7 +35,7 @@ index da21eaffa95..7e506b64dd1 100644
  
          } else {
 diff --git a/core/java/android/app/Instrumentation.java b/core/java/android/app/Instrumentation.java
-index 69b8b9510b3..548b9a5b611 100644
+index 69b8b951..548b9a5b 100644
 --- a/core/java/android/app/Instrumentation.java
 +++ b/core/java/android/app/Instrumentation.java
 @@ -284,7 +284,7 @@ public class Instrumentation {
@@ -46,8 +47,119 @@ index 69b8b9510b3..548b9a5b611 100644
          }
      }
  
+diff --git a/core/java/android/content/ContentProviderNative.java b/core/java/android/content/ContentProviderNative.java
+index 4769bd02..b127c23c 100644
+--- a/core/java/android/content/ContentProviderNative.java
++++ b/core/java/android/content/ContentProviderNative.java
+@@ -32,6 +32,7 @@ import android.os.Parcel;
+ import android.os.ParcelFileDescriptor;
+ import android.os.Parcelable;
+ import android.os.RemoteException;
++import android.util.Log;
+ 
+ import java.io.FileNotFoundException;
+ import java.util.ArrayList;
+@@ -373,6 +374,8 @@ abstract public class ContentProviderNative extends Binder implements IContentPr
+ 
+ final class ContentProviderProxy implements IContentProvider
+ {
++    private final static String TAG = "ContentProviderProxy";
++
+     public ContentProviderProxy(IBinder remote)
+     {
+         mRemote = remote;
+@@ -386,6 +389,7 @@ final class ContentProviderProxy implements IContentProvider
+     public Cursor query(String callingPkg, Uri url, String[] projection, String selection,
+             String[] selectionArgs, String sortOrder, ICancellationSignal cancellationSignal)
+                     throws RemoteException {
++        Log.i(TAG, "query: " + callingPkg + " " + url);
+         BulkCursorToCursorAdaptor adaptor = new BulkCursorToCursorAdaptor();
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+@@ -462,6 +466,7 @@ final class ContentProviderProxy implements IContentProvider
+ 
+     public Uri insert(String callingPkg, Uri url, ContentValues values) throws RemoteException
+     {
++        Log.i(TAG, "insert: " + callingPkg + " " + url);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
+@@ -483,6 +488,7 @@ final class ContentProviderProxy implements IContentProvider
+     }
+ 
+     public int bulkInsert(String callingPkg, Uri url, ContentValues[] values) throws RemoteException {
++        Log.i(TAG, "bulkInsert: " + callingPkg + " " + url);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
+@@ -503,7 +509,7 @@ final class ContentProviderProxy implements IContentProvider
+         }
+     }
+ 
+-    public ContentProviderResult[] applyBatch(String callingPkg, 
++    public ContentProviderResult[] applyBatch(String callingPkg,
+             ArrayList<ContentProviderOperation> operations)
+                     throws RemoteException, OperationApplicationException {
+         Parcel data = Parcel.obtain();
+@@ -513,6 +519,8 @@ final class ContentProviderProxy implements IContentProvider
+             data.writeString(callingPkg);
+             data.writeInt(operations.size());
+             for (ContentProviderOperation operation : operations) {
++                Log.i(TAG, "applyBatch_" + operation.getType() + ": " +
++                      callingPkg + " " + operation.getUri());
+                 operation.writeToParcel(data, 0);
+             }
+             mRemote.transact(IContentProvider.APPLY_BATCH_TRANSACTION, data, reply, 0);
+@@ -529,6 +537,7 @@ final class ContentProviderProxy implements IContentProvider
+ 
+     public int delete(String callingPkg, Uri url, String selection, String[] selectionArgs)
+             throws RemoteException {
++        Log.i(TAG, "delete: " + callingPkg + " " + url);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
+@@ -552,6 +561,7 @@ final class ContentProviderProxy implements IContentProvider
+ 
+     public int update(String callingPkg, Uri url, ContentValues values, String selection,
+             String[] selectionArgs) throws RemoteException {
++        Log.i(TAG, "update: " + callingPkg + " " + url);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
+@@ -578,6 +588,7 @@ final class ContentProviderProxy implements IContentProvider
+     public ParcelFileDescriptor openFile(
+             String callingPkg, Uri url, String mode, ICancellationSignal signal, IBinder token)
+             throws RemoteException, FileNotFoundException {
++        Log.i(TAG, "openFile_" + mode + ": " + callingPkg + " " + url);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
+@@ -606,6 +617,7 @@ final class ContentProviderProxy implements IContentProvider
+     public AssetFileDescriptor openAssetFile(
+             String callingPkg, Uri url, String mode, ICancellationSignal signal)
+             throws RemoteException, FileNotFoundException {
++        Log.i(TAG, "openAssetFile_" + mode + ": " + callingPkg + " " + url);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
+@@ -631,6 +643,7 @@ final class ContentProviderProxy implements IContentProvider
+ 
+     public Bundle call(String callingPkg, String method, String request, Bundle args)
+             throws RemoteException {
++        Log.i(TAG, "call_" + method + "_" + request + ": " + callingPkg);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
+@@ -676,6 +689,7 @@ final class ContentProviderProxy implements IContentProvider
+     @Override
+     public AssetFileDescriptor openTypedAssetFile(String callingPkg, Uri url, String mimeType,
+             Bundle opts, ICancellationSignal signal) throws RemoteException, FileNotFoundException {
++        Log.i(TAG, "openTypedAssetFile_" + mimeType + ": " + callingPkg + " " + url);
+         Parcel data = Parcel.obtain();
+         Parcel reply = Parcel.obtain();
+         try {
 diff --git a/core/java/android/os/Debug.java b/core/java/android/os/Debug.java
-index fdd34f586e8..db349927a1c 100644
+index fdd34f58..db349927 100644
 --- a/core/java/android/os/Debug.java
 +++ b/core/java/android/os/Debug.java
 @@ -711,13 +711,15 @@ public final class Debug
@@ -91,7 +203,7 @@ index fdd34f586e8..db349927a1c 100644
  
      /**
 diff --git a/services/core/java/com/android/server/wm/WindowManagerService.java b/services/core/java/com/android/server/wm/WindowManagerService.java
-index d695d936b0d..f60998525d3 100644
+index d695d936..f6099852 100644
 --- a/services/core/java/com/android/server/wm/WindowManagerService.java
 +++ b/services/core/java/com/android/server/wm/WindowManagerService.java
 @@ -10815,7 +10815,7 @@ public class WindowManagerService extends IWindowManager.Stub
@@ -104,7 +216,7 @@ index d695d936b0d..f60998525d3 100644
  
          if (CUSTOM_SCREEN_ROTATION) {
 diff --git a/test-runner/src/android/test/TestRunner.java b/test-runner/src/android/test/TestRunner.java
-index 012df350102..a8494f922af 100644
+index 012df350..a8494f92 100644
 --- a/test-runner/src/android/test/TestRunner.java
 +++ b/test-runner/src/android/test/TestRunner.java
 @@ -170,7 +170,7 @@ public class TestRunner implements PerformanceTestCase.Intermediates {
@@ -117,5 +229,5 @@ index 012df350102..a8494f922af 100644
  
      public void finishProfiling() {
 -- 
-2.13.2
+2.14.1
 
