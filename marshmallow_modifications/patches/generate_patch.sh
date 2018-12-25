@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # patch storage folder
-PATCH_DIR="/mnt/EXT_volume/projects/ReDroid/marshmallow_modifications/patches"
+PATCH_DIR="/mnt/EXT_volume/projects_light/ReDroid/marshmallow_modifications/patches"
 
 # AOSP project name
 AOSP_NAME="aosp"
 # AOSP folder path
-AOSP_ROOT="/mnt/EXT_volume/projects/aosp/aosp-latest/aosp"
+AOSP_ROOT="/mnt/EXT_volume/projects_large/aosp/aosp-latest/aosp"
 # modified AOSP project path
 AOSP_PROJECTS=(
     "build/"
@@ -21,7 +21,7 @@ AOSP_NEW_BRANCH="android-6.0.1_r77_anti-sandbox"
 # Android-x86 project name
 ANDX86_NAME="android-x86"
 # Android-x86 folder path
-ANDX86_ROOT="/mnt/EXT_volume/projects/aosp/android-x86"
+ANDX86_ROOT="/mnt/EXT_volume/projects_large/aosp/android-x86"
 # modified Android-x86 project path
 ANDX86_PROJECTS=(
     "bootable/newinstaller/"
