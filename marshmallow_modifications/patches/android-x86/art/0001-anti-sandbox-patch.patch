@@ -1,19 +1,19 @@
-From 767ed519354ffcd594f8da5aef08dfd383c1d01d Mon Sep 17 00:00:00 2001
+From fafd2cecb8430f51416c8b0a8ecc337b5dfc7d99 Mon Sep 17 00:00:00 2001
 From: Ziyue Yang <yzylivezh@hotmail.com>
-Date: Tue, 25 Dec 2018 15:57:52 +0800
+Date: Sat, 20 Apr 2019 20:44:40 +0800
 Subject: [PATCH] anti sandbox patch
 
 ---
  runtime/.vscode/settings.json                      |  5 ++
- runtime/instrumentation.cc                         | 84 +++++++++++++++++++---
- runtime/instrumentation.h                          | 15 ++++
- runtime/interpreter/interpreter_common.cc          |  6 +-
- runtime/interpreter/interpreter_goto_table_impl.cc | 18 +++--
- runtime/interpreter/interpreter_switch_impl.cc     | 18 +++--
- runtime/mirror/class-inl.h                         | 14 ++++
+ runtime/instrumentation.cc                         | 60 +++++++++++++++++++---
+ runtime/instrumentation.h                          | 15 ++++++
+ runtime/interpreter/interpreter_common.cc          |  6 ++-
+ runtime/interpreter/interpreter_goto_table_impl.cc | 18 ++++---
+ runtime/interpreter/interpreter_switch_impl.cc     | 18 ++++---
+ runtime/mirror/class-inl.h                         | 14 +++++
  runtime/mirror/class.h                             |  2 +
- runtime/runtime.cc                                 |  3 +
- 9 files changed, 143 insertions(+), 22 deletions(-)
+ runtime/runtime.cc                                 |  3 ++
+ 9 files changed, 121 insertions(+), 20 deletions(-)
  create mode 100644 runtime/.vscode/settings.json
 
 diff --git a/runtime/.vscode/settings.json b/runtime/.vscode/settings.json
@@ -29,7 +29,7 @@ index 000000000..c607f2d77
 +}
 \ No newline at end of file
 diff --git a/runtime/instrumentation.cc b/runtime/instrumentation.cc
-index d37ddcb88..4e2a5b792 100644
+index d37ddcb88..2202e2acb 100644
 --- a/runtime/instrumentation.cc
 +++ b/runtime/instrumentation.cc
 @@ -16,6 +16,7 @@
@@ -40,86 +40,15 @@ index d37ddcb88..4e2a5b792 100644
  #include <sstream>
  
  #include "arch/context.h"
-@@ -76,6 +77,8 @@ void Instrumentation::InstallStubsForClass(mirror::Class* klass) {
-   } else if (!klass->IsResolved()) {
-     // We need the class to be resolved to install/uninstall stubs. Otherwise its methods
-     // could not be initialized or linked with regards to class inheritance.
-+  } else if (!IsClassMonitored(klass)) {
-+    // Add stubs only for classes monitored by ReDroid.
-   } else {
-     for (size_t i = 0, e = klass->NumDirectMethods(); i < e; i++) {
-       InstallStubsForMethod(klass->GetDirectMethod(i, sizeof(void*)));
-@@ -115,6 +118,10 @@ static void UpdateEntrypoints(ArtMethod* method, const void* quick_code)
- }
- 
- void Instrumentation::InstallStubsForMethod(ArtMethod* method) {
-+  // Don't stub customized methods for ReDroid.
-+  if (!IsMethodMonitored(method)) {
-+    return;
-+  }
-   if (method->IsAbstract() || method->IsProxyMethod()) {
-     // Do not change stubs for these methods.
-     return;
-@@ -166,12 +173,14 @@ void Instrumentation::InstallStubsForMethod(ArtMethod* method) {
- static void InstrumentationInstallStack(Thread* thread, void* arg)
-     SHARED_LOCKS_REQUIRED(Locks::mutator_lock_) {
-   struct InstallStackVisitor FINAL : public StackVisitor {
--    InstallStackVisitor(Thread* thread_in, Context* context, uintptr_t instrumentation_exit_pc)
-+    InstallStackVisitor(Thread* thread_in, Context* context, uintptr_t instrumentation_exit_pc,
-+                        Instrumentation *instrumentation)
-         : StackVisitor(thread_in, context, kInstrumentationStackWalk),
-           instrumentation_stack_(thread_in->GetInstrumentationStack()),
-           instrumentation_exit_pc_(instrumentation_exit_pc),
-           reached_existing_instrumentation_frames_(false), instrumentation_stack_depth_(0),
--          last_return_pc_(0) {
-+          last_return_pc_(0),
-+          instrumentation_(instrumentation) {
-     }
- 
-     bool VisitFrame() OVERRIDE SHARED_LOCKS_REQUIRED(Locks::mutator_lock_) {
-@@ -184,6 +193,10 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
-         return true;  // Ignore upcalls.
-       }
-       if (GetCurrentQuickFrame() == nullptr) {
-+        // Push shadow stack only for methods monitored by ReDroid.
-+        if (!instrumentation_->IsMethodMonitored(m)) {
-+          return true;
-+        }
-         bool interpreter_frame = true;
-         InstrumentationStackFrame instrumentation_frame(GetThisObject(), m, 0, GetFrameId(),
-                                                         interpreter_frame);
-@@ -238,6 +251,13 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
+@@ -238,6 +239,7 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
        } else {
          CHECK_NE(return_pc, 0U);
          CHECK(!reached_existing_instrumentation_frames_);
 +
-+        // Do not insert instrumentation frame for customized methods in ReDroid.
-+        if (!instrumentation_->IsMethodMonitored(m)) {
-+          last_return_pc_ = return_pc;
-+          return true;
-+        }
-+
          InstrumentationStackFrame instrumentation_frame(GetThisObject(), m, return_pc, GetFrameId(),
                                                          false);
          if (kVerboseInstrumentation) {
-@@ -268,6 +288,7 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
-     bool reached_existing_instrumentation_frames_;
-     size_t instrumentation_stack_depth_;
-     uintptr_t last_return_pc_;
-+    Instrumentation* const instrumentation_;
-   };
-   if (kVerboseInstrumentation) {
-     std::string thread_name;
-@@ -278,7 +299,7 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
-   Instrumentation* instrumentation = reinterpret_cast<Instrumentation*>(arg);
-   std::unique_ptr<Context> context(Context::Create());
-   uintptr_t instrumentation_exit_pc = reinterpret_cast<uintptr_t>(GetQuickInstrumentationExitPc());
--  InstallStackVisitor visitor(thread, context.get(), instrumentation_exit_pc);
-+  InstallStackVisitor visitor(thread, context.get(), instrumentation_exit_pc, instrumentation);
-   visitor.WalkStack(true);
-   CHECK_EQ(visitor.dex_pcs_.size(), thread->GetInstrumentationStack()->size());
- 
-@@ -289,13 +310,17 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
+@@ -289,13 +291,17 @@ static void InstrumentationInstallStack(Thread* thread, void* arg)
      for (auto isi = thread->GetInstrumentationStack()->rbegin(),
          end = thread->GetInstrumentationStack()->rend(); isi != end; ++isi) {
        while (ssi != visitor.shadow_stack_.rend() && (*ssi).frame_id_ < (*isi).frame_id_) {
@@ -139,15 +68,7 @@ index d37ddcb88..4e2a5b792 100644
        }
      }
    }
-@@ -335,6 +360,7 @@ static void InstrumentationRestoreStack(Thread* thread, void* arg)
-       }
-       bool removed_stub = false;
-       // TODO: make this search more efficient?
-+      // In ReDroid some methods don't have exit stub, and search fails.
-       const size_t frameId = GetFrameId();
-       for (const InstrumentationStackFrame& instrumentation_frame : *instrumentation_stack_) {
-         if (instrumentation_frame.frame_id_ == frameId) {
-@@ -350,8 +376,10 @@ static void InstrumentationRestoreStack(Thread* thread, void* arg)
+@@ -350,8 +356,10 @@ static void InstrumentationRestoreStack(Thread* thread, void* arg)
            if (instrumentation_->ShouldNotifyMethodEnterExitEvents()) {
              // Create the method exit events. As the methods didn't really exit the result is 0.
              // We only do this if no debugger is attached to prevent from posting events twice.
@@ -160,7 +81,7 @@ index d37ddcb88..4e2a5b792 100644
            }
            frames_removed_++;
            removed_stub = true;
-@@ -714,6 +742,45 @@ bool Instrumentation::IsDeoptimizedMethodsEmpty() const {
+@@ -714,6 +722,45 @@ bool Instrumentation::IsDeoptimizedMethodsEmpty() const {
    return deoptimized_methods_.empty();
  }
  
@@ -206,13 +127,22 @@ index d37ddcb88..4e2a5b792 100644
  void Instrumentation::Deoptimize(ArtMethod* method) {
    CHECK(!method->IsNative());
    CHECK(!method->IsProxyMethod());
-@@ -1001,7 +1068,8 @@ TwoWordReturn Instrumentation::PopInstrumentationStackFrame(Thread* self, uintpt
+@@ -967,7 +1014,7 @@ void Instrumentation::PushInstrumentationStackFrame(Thread* self, mirror::Object
+                                                                    frame_id, interpreter_entry);
+   stack->push_front(instrumentation_frame);
+ 
+-  if (!interpreter_entry) {
++  if (UNLIKELY(!interpreter_entry && IsMethodMonitored(method))) {
+     MethodEnterEvent(self, this_object, method, 0);
+   }
+ }
+@@ -1001,7 +1048,8 @@ TwoWordReturn Instrumentation::PopInstrumentationStackFrame(Thread* self, uintpt
    //       return_pc.
    uint32_t dex_pc = DexFile::kDexNoIndex;
    mirror::Object* this_object = instrumentation_frame.this_object_;
 -  if (!instrumentation_frame.interpreter_entry_) {
-+  if (!instrumentation_frame.interpreter_entry_ &&
-+      IsMethodMonitored(instrumentation_frame.method_)) {
++  if (UNLIKELY(!instrumentation_frame.interpreter_entry_ &&
++               IsMethodMonitored(instrumentation_frame.method_))) {
      MethodExitEvent(self, this_object, instrumentation_frame.method_, dex_pc, return_value);
    }
  
